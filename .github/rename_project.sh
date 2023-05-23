@@ -20,8 +20,8 @@ original_author="PeteHeine"
 original_name="torch_bricks"
 original_urlname="torch_bricks"
 original_description="Awesome torch_bricks created by PeteHeine"
-# for filename in $(find . -name "*.*") 
-for filename in $(git ls-files) 
+# for filename in $(find . -name "*.*")
+for filename in $(git ls-files)
 do
     sed -i "s/$original_author/$author/g" $filename
     sed -i "s/$original_name/$name/g" $filename

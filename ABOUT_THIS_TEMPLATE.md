@@ -2,9 +2,9 @@
 
 Hi, I created this template to help you get started with a new project.
 
-I have created and maintained a number of python libraries, applications and 
-frameworks and during those years I have learned a lot about how to create a 
-project structure and how to structure a project to be as modular and simple 
+I have created and maintained a number of python libraries, applications and
+frameworks and during those years I have learned a lot about how to create a
+project structure and how to structure a project to be as modular and simple
 as possible.
 
 Some decisions I have made while creating this template are:
@@ -103,7 +103,7 @@ The substituions are done using github actions and a simple sed script.
 ### Why `VERSION` is kept in a static plain text file?
 
 I used to have my version inside my main module in a `__version__` variable, then
-I had to do some tricks to read that version variable inside the setuptools 
+I had to do some tricks to read that version variable inside the setuptools
 `setup.py` file because that would be available only after the installation.
 
 I decided to keep the version in a static file because it is easier to read from
@@ -114,14 +114,14 @@ with module imports or anything else, it is useful for CI, logs and debugging.
 
 ### Why to include `tests`, `history` and `Containerfile` as part of the release?
 
-The `MANIFEST.in` file is used to include the files in the release, once the 
+The `MANIFEST.in` file is used to include the files in the release, once the
 project is released to PyPI all the files listed on MANIFEST.in will be included
 even if the files are static or not related to Python.
 
 Some build systems such as RPM, DEB, AUR for some Linux distributions, and also
 internal repackaging systems tends to run the tests before the packaging is performed.
 
-The Containerfile can be useful to provide a safer execution environment for 
+The Containerfile can be useful to provide a safer execution environment for
 the project when running on a testing environment.
 
 I added those files to make it easier for packaging in different formats.
@@ -167,7 +167,7 @@ the way you think is best.
 This template provides utilities in the Makefile to make it easier to you can run:
 
 ```bash
-$ make init 
+$ make init
 Which template do you want to apply? [flask, fastapi, click, typer]? > flask
 Generating a new project with Flask ...
 ```

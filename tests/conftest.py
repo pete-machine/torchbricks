@@ -6,7 +6,7 @@ import pytest
 @pytest.fixture(autouse=True)
 def go_to_tmpdir(request):
     # Get the fixture dynamically by its name.
-    tmpdir = request.getfixturevalue("tmpdir")
+    tmpdir = request.getfixturevalue('tmpdir')
     # ensure local test created packages can be imported
     sys.path.insert(0, str(tmpdir))
     # Chdir only for the duration of the test.
