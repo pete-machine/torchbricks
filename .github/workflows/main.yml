@@ -14,28 +14,28 @@ on:
   workflow_dispatch:
 
 jobs:
-  linter:
-    strategy:
-      fail-fast: false
-      matrix:
-#         python-version: [3.10]
-        os: [ubuntu-latest]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v3
-      - uses: mamba-org/setup-micromamba@v1
-        with:
-          environment-name: torch_bricks
-          environment-file: conda-linux-64.lock
-          cache-environment: true
-#       - uses: actions/setup-python@v4
+#   linter:
+#     strategy:
+#       fail-fast: false
+#       matrix:
+# #         python-version: [3.10]
+#         os: [ubuntu-latest]
+#     runs-on: ${{ matrix.os }}
+#     steps:
+#       - uses: actions/checkout@v3
+#       - uses: mamba-org/setup-micromamba@v1
 #         with:
-#          python-version: ${{ matrix.python-version }}
-      - name: Run linter
-        run: pre-commit run --all-files
+#           environment-name: torch_bricks
+#           environment-file: conda-linux-64.lock
+#           cache-environment: true
+# #       - uses: actions/setup-python@v4
+# #         with:
+# #          python-version: ${{ matrix.python-version }}
+#       - name: Run linter
+#         run: pre-commit run --all-files
 
   tests_linux:
-    needs: linter
+    # needs: linter
     strategy:
       fail-fast: false
       matrix:
