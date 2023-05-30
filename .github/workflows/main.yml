@@ -56,6 +56,6 @@ jobs:
           init-shell: bash
       - name: Run tests
         run: make test
-        shell: micromamba-shell {0}
+        # shell: micromamba-shell {0}
       - name: "Upload coverage to Codecov"
         uses: codecov/codecov-action@v3
