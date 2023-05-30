@@ -52,8 +52,10 @@ jobs:
           environment-name: torch_bricks
           environment-file: conda-linux-64.lock
           cache-environment: true
+          generate-run-shell: true
           init-shell: bash
       - name: Run tests
         run: make test
+        shell: micromamba-shell {0}
       - name: "Upload coverage to Codecov"
         uses: codecov/codecov-action@v3
