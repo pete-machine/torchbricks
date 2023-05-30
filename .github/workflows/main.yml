@@ -55,6 +55,7 @@ jobs:
           generate-run-shell: true
       - name: Run linter
         run: make lint
+        shell: micromamba-shell {0}
       - name: Run tests
         run: make test
         shell: micromamba-shell {0}
