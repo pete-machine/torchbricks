@@ -66,5 +66,3 @@ def test_brick_collection():
     model.on_step(state=state, named_tensors=named_tensors, batch_idx=0)
     model.on_step(state=state, named_tensors=named_tensors, batch_idx=0)
     model.summarize(state=state, reset=True)
-
-    # print("Wait!")

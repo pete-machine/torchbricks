@@ -14,10 +14,13 @@ show:             ## Show the current environment.
 	@echo "Current environment:"
 	@mamba info
 
+.PHONY: lint
+lint:             ## Perform linting on all files using pre-commit
+	pre-commit run --all-files
 
 .PHONY: install
 install:          ## create environment using lock-file
-	@conda create --name torch_bricks --file conda-linux-64.lock
+	@mamba create --name torch_bricks --file conda-linux-64.lock
 
 
 .PHONY: update
