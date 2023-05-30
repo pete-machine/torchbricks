@@ -10,8 +10,9 @@ channels:
 dependencies:
   - python=3.10.*  # or don't specify the version and use the latest stable Python
   - mamba
+  - conda-lock
   - pip  # pip must be mentioned explicitly, or conda-lock will fail
-  - poetry=1.*  # or 1.1.*, or no version at all -- as you want
+  # - poetry=1.*  # or 1.1.*, or no version at all -- as you want
   - pytorch::pytorch=2.0.1
   - pytorch::torchvision=0.15.2
   - pytorch::pytorch-cuda=11.7
@@ -19,11 +20,12 @@ dependencies:
   - pytorch-lightning=2.0.2
   - torchmetrics=0.11.4
 
-# Linting stuff
+  # Linting stuff
   - pre-commit=3.3.2
   - coverage=7.2.5
   - pytest=7.3.1
   - pytest-cov=4.0.0
+
 # Non-standard section listing target platforms for conda-lock:
 platforms:
   - linux-64
