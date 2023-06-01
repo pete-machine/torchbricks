@@ -1,5 +1,5 @@
 .ONESHELL:
-ENV_PREFIX=""# $(shell python3 -c "if __import__('pathlib').Path('.venv/bin/pip').exists(): print('.venv/bin/')")
+ENV_PREFIX=""
 
 .PHONY: help
 help:             ## Show the help.
@@ -24,14 +24,16 @@ install:          ## create environment using lock-file
 
 
 .PHONY: update
-update:          ## Update lock file using the specification in 'environment.yml'
+update:           ## Update lock file using the specification in 'environment.yml'
 	@conda-lock -k explicit --conda mamba -f environment.yml
 
 .PHONY: test
 test:        	  ## Run tests and generate coverage report.
+	set -e
 	$(ENV_PREFIX)pytest -v --cov-config .coveragerc --cov=src -l --tb=short --maxfail=1 tests/
 	$(ENV_PREFIX)coverage xml
 	$(ENV_PREFIX)coverage html
+
 
 .PHONY: watch
 watch:            ## Run tests on every change.
