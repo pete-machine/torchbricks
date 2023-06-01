@@ -1,5 +1,5 @@
 .ONESHELL:
-ENV_PREFIX=""
+PYTHONPATH=PYTHONPATH=$(shell pwd)/src
 
 .PHONY: help
 help:             ## Show the help.
@@ -30,9 +30,9 @@ update:           ## Update lock file using the specification in 'environment.ym
 .PHONY: test
 test:        	  ## Run tests and generate coverage report.
 	set -e
-	$(ENV_PREFIX)pytest -v --cov-config .coveragerc --cov=src -l --tb=short --maxfail=1 tests/
-	$(ENV_PREFIX)coverage xml
-	$(ENV_PREFIX)coverage html
+	$(PYTHONPATH) pytest -v --cov-config .coveragerc --cov=src -l --tb=short --maxfail=1 tests/
+	coverage xml
+	coverage html
 
 
 .PHONY: watch
