@@ -130,3 +130,7 @@ dmypy.json
 
 # templates
 .github/templates/*
+
+data/
+runs/
+wandb/

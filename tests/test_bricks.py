@@ -1,5 +1,5 @@
 from torch_bricks import bricks
-from torch_bricks.bricks import RunState
+from torch_bricks.bricks import Phase
 from torch_bricks import custom_metrics
 from typing import Dict
 import torch
@@ -60,9 +60,9 @@ def test_brick_collection():
     model = bricks.BrickCollection(bricks=brick_collection)
     named_tensors = {'labels': torch.tensor(range(num_classes), dtype=torch.float64), 'raw': torch.zeros((3, 24, 24))}
 
-    state = RunState.TRAIN
-    model(state=state, named_tensors=named_tensors)
-    model.on_step(state=state, named_tensors=named_tensors, batch_idx=0)
-    model.on_step(state=state, named_tensors=named_tensors, batch_idx=0)
-    model.on_step(state=state, named_tensors=named_tensors, batch_idx=0)
-    model.summarize(state=state, reset=True)
+    phase = Phase.TRAIN
+    model(phase=phase, named_tensors=named_tensors)
+    model.on_step(phase=phase, named_tensors=named_tensors, batch_idx=0)
+    model.on_step(phase=phase, named_tensors=named_tensors, batch_idx=0)
+    model.on_step(phase=phase, named_tensors=named_tensors, batch_idx=0)
+    model.summarize(phase=phase, reset=True)

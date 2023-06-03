@@ -6,7 +6,7 @@ from torch import nn
 from torchmetrics import MetricCollection, Metric
 
 
-class RunState(Enum):           # Gradients/backward  Eval-model    Targets
+class Phase(Enum):           # Gradients/backward  Eval-model    Targets
     TRAIN = 'train'             # Y                   Y             Y
     VALIDATION = 'validation'   # N                   N             Y
     TEST = 'test'               # N                   N             Y
@@ -41,7 +41,7 @@ def named_input_and_outputs_callable(callable: Callable,
 
 class Brick(nn.Module):
 
-    def forward(self, state: RunState, named_tensors: Dict[str, Any]) -> Dict[str, Any]:
+    def forward(self, phase: Phase, named_tensors: Dict[str, Any]) -> Dict[str, Any]:
         """"""
         raise ValueError(f"If you are not using 'forward' then set it to 'forward=None' in class {self}")
         return named_tensors
@@ -51,23 +51,23 @@ class Brick(nn.Module):
         raise ValueError(f"If you are not using 'calculate_loss' then set it to 'calculate_loss=None' in class {self}")
         return {}
 
-    def update_metrics(self, state: RunState, named_tensors: Dict[str, Any], batch_idx: int) -> None:
+    def update_metrics(self, phase: Phase, named_tensors: Dict[str, Any], batch_idx: int) -> None:
         """"""
         raise ValueError(f"If you are not using 'update_metrics' then set it to 'update_metrics=None' in class {self}")
 
-    def summarize(self, state: RunState, reset: bool) -> Dict[str, Any]:
+    def summarize(self, phase: Phase, reset: bool) -> Dict[str, Any]:
         """"""
         raise ValueError(f"If you are not using 'summarize' then set it to 'summarize=None' in class {self}")
         return {}
 
-    def on_step(self, state: RunState, named_tensors: Dict[str, Any], batch_idx: int) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    def on_step(self, phase: Phase, named_tensors: Dict[str, Any], batch_idx: int) -> Tuple[Dict[str, Any], Dict[str, Any]]:
 
-        named_tensors = self.forward(state=state, named_tensors=named_tensors)
+        named_tensors = self.forward(phase=phase, named_tensors=named_tensors)
         losses = self.calculate_loss(named_tensors=named_tensors)
         named_tensors.update(losses)
 
         with torch.no_grad():
-            self.update_metrics(state=state, named_tensors=named_tensors, batch_idx=batch_idx)
+            self.update_metrics(phase=phase, named_tensors=named_tensors, batch_idx=batch_idx)
         return named_tensors, losses
 
 
@@ -76,10 +76,10 @@ class BrickCollection(Brick):
         super().__init__()
         self.bricks = nn.Sequential(OrderedDict(bricks))
 
-    def forward(self, state: RunState, named_tensors: Dict[str, Any]) -> Dict[str, Any]:
+    def forward(self, phase: Phase, named_tensors: Dict[str, Any]) -> Dict[str, Any]:
         forward_bricks = [brick for brick in self.bricks if brick.forward is not None]
         for brick in forward_bricks:
-            results = brick.forward(state=state, named_tensors=named_tensors)
+            results = brick.forward(phase=phase, named_tensors=named_tensors)
             if results is None:
                 results = {}
             named_tensors.update(results)
@@ -93,23 +93,17 @@ class BrickCollection(Brick):
                 losses.update(brick.calculate_loss(named_tensors=named_tensors))
         return losses
 
-    def update_metrics(self, state: RunState, named_tensors: Dict[str, Any], batch_idx: int) -> None:
+    def update_metrics(self, phase: Phase, named_tensors: Dict[str, Any], batch_idx: int) -> None:
         update_metrics_bricks = [brick for brick in self.bricks if brick.update_metrics is not None]
         for brick in update_metrics_bricks:
-            brick.update_metrics(state=state, named_tensors=named_tensors, batch_idx=batch_idx)
+            brick.update_metrics(phase=phase, named_tensors=named_tensors, batch_idx=batch_idx)
 
-    def summarize(self, state: RunState, reset: bool) -> Dict[str, Any]:
+    def summarize(self, phase: Phase, reset: bool) -> Dict[str, Any]:
         update_metrics_bricks = [brick for brick in self.bricks if brick.summarize is not None]
         metrics = {}
         for brick in update_metrics_bricks:
-            metrics.update(brick.summarize(state=state, reset=reset))
+            metrics.update(brick.summarize(phase=phase, reset=reset))
         return metrics
-
-# class BrickExecutor:
-#     on_step = None          # Includes forward, calculate_loss, update_metrics
-#     on_epoch_end = None
-
-
 
 
 class BrickTrainable(Brick):
@@ -123,11 +117,12 @@ class BrickTrainable(Brick):
         self.output_names = output_names
         self.model = model
 
-    def forward(self, state: RunState, named_tensors: Dict[str, Any]) -> Dict[str, Any]:
-        named_tensors['state'] = state
-        selected_inputs = select_inputs(named_tensors, input_names=self.input_names)
-        outputs = self.model(*selected_inputs)
-        return name_callable_outputs(outputs=outputs, output_names=self.output_names)
+    def forward(self, phase: Phase, named_tensors: Dict[str, Any]) -> Dict[str, Any]:
+        named_tensors['phase'] = phase
+        return named_input_and_outputs_callable(callable=self.model,
+                                                named_tensors=named_tensors,
+                                                input_names=self.input_names,
+                                                output_names=self.output_names)
 
 
 class BrickNotTrainable(Brick):
@@ -142,12 +137,14 @@ class BrickNotTrainable(Brick):
         self.model = model
         self.model.requires_grad_(False)
 
-    def forward(self, state: RunState, named_tensors: Dict[str, Any]) -> Dict[str, Any]:
-        named_tensors['state'] = state
-        selected_inputs = select_inputs(named_tensors, input_names=self.input_names)
-        with torch.no_grad():
-            outputs = self.model(*tuple(selected_inputs))
-        return name_callable_outputs(outputs=outputs, output_names=self.output_names)
+    @torch.no_grad()
+    def forward(self, phase: Phase, named_tensors: Dict[str, Any]) -> Dict[str, Any]:
+        named_tensors['phase'] = phase
+        return named_input_and_outputs_callable(callable=self.model,
+                                                named_tensors=named_tensors,
+                                                input_names=self.input_names,
+                                                output_names=self.output_names)
+
 
 
 class BrickLoss(Brick):
@@ -162,8 +159,10 @@ class BrickLoss(Brick):
         self.output_names = output_names
 
     def calculate_loss(self, named_tensors: Dict[str, Any]) -> Dict[str, Any]:
-        outputs = self.model(*select_inputs(named_tensors, input_names=self.input_names))
-        return name_callable_outputs(outputs=outputs, output_names=self.output_names)
+        return named_input_and_outputs_callable(callable=self.model,
+                                                named_tensors=named_tensors,
+                                                input_names=self.input_names,
+                                                output_names=self.output_names)
 
 
 class BrickTorchMetric(Brick):
@@ -177,34 +176,34 @@ class BrickTorchMetric(Brick):
         train_args = {}
         test_args = {}
         if isinstance(metric, MetricCollection):
-            train_args['prefix'] = self.get_metric_name(RunState.TRAIN, metric_name=metric_name)
-            val_args['prefix'] = self.get_metric_name(RunState.VALIDATION, metric_name=metric_name)
-            test_args['prefix'] = self.get_metric_name(RunState.TEST, metric_name=metric_name)
+            train_args['prefix'] = self.get_metric_name(Phase.TRAIN, metric_name=metric_name)
+            val_args['prefix'] = self.get_metric_name(Phase.VALIDATION, metric_name=metric_name)
+            test_args['prefix'] = self.get_metric_name(Phase.TEST, metric_name=metric_name)
         self.metrics_train = metric.clone(**train_args)
         self.metrics_validation = metric.clone(**val_args)
         self.metrics_test = metric.clone(**test_args)
 
-    def _select_metric_collection_from_split(self, state: RunState) -> MetricCollection:
-        if state == RunState.TRAIN:
+    def _select_metric_collection_from_split(self, phase: Phase) -> MetricCollection:
+        if phase == Phase.TRAIN:
             return self.metrics_train
-        elif state == RunState.TEST:
+        elif phase == Phase.TEST:
             return self.metrics_test
-        elif state == RunState.VALIDATION:
+        elif phase == Phase.VALIDATION:
             return self.metrics_validation
         raise TypeError('')
 
     @staticmethod
-    def get_metric_name(state: RunState, metric_name: str) -> str:
-        return f'{state.value}/{metric_name}'
+    def get_metric_name(phase: Phase, metric_name: str) -> str:
+        return f'{phase.value}/{metric_name}'
 
-    def update_metrics(self, state: RunState, named_tensors: Dict[str, Any], batch_idx: int) -> None:
-        metric = self._select_metric_collection_from_split(state=state)
-        named_tensors['state'] = state
+    def update_metrics(self, phase: Phase, named_tensors: Dict[str, Any], batch_idx: int) -> None:
+        metric = self._select_metric_collection_from_split(phase=phase)
+        named_tensors['phase'] = phase
         selected_inputs = select_inputs(named_tensors, input_names=self.input_names)
         metric.update(*selected_inputs)
 
-    def summarize(self, state: RunState, reset: bool):
-        metric = self._select_metric_collection_from_split(state=state)
+    def summarize(self, phase: Phase, reset: bool):
+        metric = self._select_metric_collection_from_split(phase=phase)
         metrics = metric.compute()
         if reset:
             metric.reset()

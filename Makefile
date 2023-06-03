@@ -29,7 +29,7 @@ update:           ## Update lock file using the specification in 'environment.ym
 
 .PHONY: test
 test:        	  ## Run tests and generate coverage report.
-	set -e
+	@set -e
 	$(PYTHONPATH) pytest -v --cov-config .coveragerc --cov=src -l --tb=short --maxfail=1 tests/
 	coverage xml
 	coverage html
