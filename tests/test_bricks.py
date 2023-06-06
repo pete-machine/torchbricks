@@ -1,6 +1,6 @@
-from torch_bricks import bricks
-from torch_bricks.bricks import Phase
-from torch_bricks import custom_metrics
+from torchbricks import bricks
+from torchbricks.bricks import Phase
+from torchbricks import custom_metrics
 from typing import Dict
 import torch
 from torch import nn

@@ -2,4 +2,4 @@ include LICENSE
 include HISTORY.md
 include Containerfile
 graft tests
-graft src/torch_bricks
+graft src/torchbricks

@@ -1,13 +1,13 @@
 # torchbricks
 
-[![codecov](https://codecov.io/gh/PeteHeine/torchbricks/branch/main/graph/badge.svg?token=torch_bricks_token_here)](https://codecov.io/gh/PeteHeine/torchbricks)
+[![codecov](https://codecov.io/gh/PeteHeine/torchbricks/branch/main/graph/badge.svg?token=torchbricks_token_here)](https://codecov.io/gh/PeteHeine/torchbricks)
 [![CI](https://github.com/PeteHeine/torchbricks/actions/workflows/main.yml/badge.svg)](https://github.com/PeteHeine/torchbricks/actions/workflows/main.yml)
 
 
 ## Install it from PyPI
 
 ```bash
-pip install torch_bricks
+pip install torchbricks
 ```
 
 ## Usage
@@ -17,9 +17,9 @@ pip install torch_bricks
 ```
 
 ```bash
-$ python -m torch_bricks
+$ python -m torchbricks
 #or
-$ torch_bricks
+$ torchbricks
 ```
 
 ## Development
@@ -49,7 +49,6 @@ Consider just using mamba for installing libraries.
 
     # Re-generate Conda lock file(s) based on environment.yml
     conda-lock -k explicit --conda mamba -f environment.yml
+
     # Update Conda packages based on re-generated lock file
     mamba update --file conda-linux-64.lock
-    # Update Poetry packages and re-generate poetry.lock
-    poetry update

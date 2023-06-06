@@ -8,7 +8,7 @@ import torchvision
 from functools import partial
 from lightning_module import CIFAR10DataModule, LightningBrickCollection, create_cifar_bricks, create_lr_schedular_one_cycle_lr
 
-from torch_bricks.bricks import BrickCollection, Phase
+from torchbricks.bricks import BrickCollection, Phase
 
 
 

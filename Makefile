@@ -10,25 +10,29 @@ help:             ## Show the help.
 
 
 .PHONY: show
-show:             ## Show the current environment.
+show:                    ## Show the current environment.
 	@echo "Current environment:"
 	@mamba info
 
 .PHONY: lint
-lint:             ## Perform linting on all files using pre-commit
+lint:                    ## Perform linting on all files using pre-commit
 	pre-commit run --all-files
 
 .PHONY: install
-install:          ## create environment using lock-file
-	@mamba create --name torch_bricks --file conda-linux-64.lock
+install:                 ## create environment using lock-file
+	@mamba create --name torchbricks --file conda-linux-64.lock
 
 
-.PHONY: update
-update:           ## Update lock file using the specification in 'environment.yml'
+.PHONY: update-lock-file
+update-lock-file:        ## Update lock file using the specification in 'environment.yml'
 	@conda-lock -k explicit --conda mamba -f environment.yml
 
+.PHONY: update
+update: update-lock-file install ## Update lock file using the specification in 'environment.yml'
+
+
 .PHONY: test
-test:        	  ## Run tests and generate coverage report.
+test:        	         ## Run tests and generate coverage report.
 	@set -e
 	$(PYTHONPATH) pytest -v --cov-config .coveragerc --cov=src -l --tb=short --maxfail=1 tests/
 	coverage xml
@@ -36,16 +40,16 @@ test:        	  ## Run tests and generate coverage report.
 
 
 .PHONY: test_training
-test_training:    ## Run CIFAR10 training
+test_training:           ## Run CIFAR10 training
 	@set -e
 	$(PYTHONPATH) python scripts/lightning_bricks.py --batch_size 256 --num_workers 10 --max_epochs 20 --accelerator gpu
 
 .PHONY: watch
-watch:            ## Run tests on every change.
+watch:                   ## Run tests on every change.
 	ls **/**.py | entr $(ENV_PREFIX)pytest -s -vvv -l --tb=long --maxfail=1 tests/
 
 .PHONY: clean
-clean:            ## Clean unused files.
+clean:                   ## Clean unused files.
 	@find ./ -name '*.pyc' -exec rm -f {} \;
 	@find ./ -name '__pycache__' -exec rm -rf {} \;
 	@find ./ -name 'Thumbs.db' -exec rm -f {} \;
@@ -64,9 +68,9 @@ clean:            ## Clean unused files.
 # release:          ## Create a new tag for release.
 # 	@echo "WARNING: This operation will create s version tag and push to github"
 # 	@read -p "Version? (provide the next x.y.z semver) : " TAG
-# 	@echo "$${TAG}" > torch_bricks/VERSION
+# 	@echo "$${TAG}" > torchbricks/VERSION
 # 	@$(ENV_PREFIX)gitchangelog > HISTORY.md
-# 	@git add torch_bricks/VERSION HISTORY.md
+# 	@git add torchbricks/VERSION HISTORY.md
 # 	@git commit -m "release: version $${TAG} 🚀"
 # 	@echo "creating git tag : $${TAG}"
 # 	@git tag $${TAG}

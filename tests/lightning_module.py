@@ -11,8 +11,8 @@ import torchvision
 from torchvision import datasets, transforms
 from torch.utils.data import random_split, DataLoader
 
-from torch_bricks.bricks import Brick, BrickCollection, BrickLoss, BrickNotTrainable, BrickTorchMetric, BrickTrainable, Phase
-from torch_bricks.custom_metrics import ConcatenatePredictionAndTarget
+from torchbricks.bricks import Brick, BrickCollection, BrickLoss, BrickNotTrainable, BrickTorchMetric, BrickTrainable, Phase
+from torchbricks.custom_metrics import ConcatenatePredictionAndTarget
 
 
 
