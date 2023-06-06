@@ -1,6 +1,6 @@
 # How to develop on this project
 
-torch_bricks welcomes contributions from the community.
+torchbricks welcomes contributions from the community.
 
 **You need PYTHON3!**
 
@@ -11,11 +11,6 @@ This instructions are for linux base systems. (Linux, MacOS, BSD, etc.)
 - Clone your fork of this repo. `git clone git@github.com:YOUR_GIT_USERNAME/torchbricks.git`
 - Enter the directory `cd torchbricks`
 - Add upstream repo `git remote add upstream https://github.com/PeteHeine/torchbricks`
-
-## Setting up your own virtual environment
-
-Run `make virtualenv` to create a virtual environment.
-then activate it with `source .venv/bin/activate`.
 
 ## Install the project in develop mode
 
@@ -31,11 +26,7 @@ Run `git checkout -b my_contribution`
 
 ## Make your changes
 
-Edit the files using your preferred editor. (we recommend VIM or VSCode)
-
-## Format the code
-
-Run `make fmt` to format the code.
+Edit the files using your preferred editor. (we recommend VSCode)
 
 ## Run the linter
 
@@ -45,7 +36,7 @@ Run `make lint` to run the linter.
 
 Run `make test` to run the tests.
 
-Ensure code coverage report shows `100%` coverage, add tests to your PR.
+Ensure code coverage is high and add tests to your PR.
 
 ## Build the docs locally
 
@@ -79,16 +70,12 @@ Usage: make <target>
 Targets:
 help:             ## Show the help.
 install:          ## Install the project in dev mode.
-fmt:              ## Format code using black & isort.
-lint:             ## Run pep8, black, mypy linters.
+lint:             ## Run ruff linters.
 test: lint        ## Run tests and generate coverage report.
 watch:            ## Run tests on every change.
 clean:            ## Clean unused files.
-virtualenv:       ## Create a virtual environment.
 release:          ## Create a new tag for release.
 docs:             ## Build the documentation.
-switch-to-poetry: ## Switch to poetry package manager.
-init:             ## Initialize the project based on an application template.
 ```
 
 ## Making a new release
