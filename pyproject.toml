@@ -34,6 +34,6 @@ commit          = true
 tag             = true
 push            = false
 
-[tool.bumpver.file_patterns]
+[tool.bumpver.file_patterns]  # Specify all files containging version-numbers
 "pyproject.toml" = ['current_version = "{version}"', 'version = "{version}"']
 "src/torchbricks/__init__.py" = ["{version}"]

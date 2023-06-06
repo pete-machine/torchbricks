@@ -20,12 +20,12 @@ lint:                    ## Perform linting on all files using pre-commit
 
 .PHONY: install
 install:                 ## create environment using lock-file
-	@mamba create --name torchbricks --file conda-linux-64.lock
+	mamba create --name torchbricks --file conda-linux-64.lock
 
 
 .PHONY: update-lock-file
 update-lock-file:        ## Update lock file using the specification in 'environment.yml'
-	@conda-lock -k explicit --conda mamba -f environment.yml
+	conda-lock -k explicit --conda mamba -f environment.yml
 
 .PHONY: update
 update: update-lock-file install ## Update lock file using the specification in 'environment.yml'
