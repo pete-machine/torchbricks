@@ -24,11 +24,11 @@ jobs:
       - name: Generate Changelog
         run: |
           set -e
-          .github/release_message.sh > ${{ github.workspace }}-release_message.md
+          .github/release_message.sh > ${{ github.workspace }}/release_message.md
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
-          body_path: ${{ github.workspace }}-release_message.md
+          body_path: ${{ github.workspace }}/release_message.md
 
   deploy:
     needs: release
