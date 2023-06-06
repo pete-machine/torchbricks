@@ -1,5 +1,5 @@
 include LICENSE
-include HISTORY.md
-include Containerfile
-graft tests
+# include HISTORY.md
+# include Containerfile
+# graft tests
 graft src/torchbricks

@@ -64,8 +64,17 @@ clean:                   ## Clean unused files.
 	@rm -rf .tox/
 	@rm -rf docs/_build
 
-# .PHONY: release
-# release:          ## Create a new tag for release.
+# .PHONY: build
+# build: clean		 	  ## Clean and build
+# 	@set -e
+# 	python -m build
+# 	twine check dist/*
+# 	# twine upload -r testpypi dist/*
+# 	twine upload dist/*
+
+
+.PHONY: release
+release:          ## Create a new tag for release.
 # 	@echo "WARNING: This operation will create s version tag and push to github"
 # 	@read -p "Version? (provide the next x.y.z semver) : " TAG
 # 	@echo "$${TAG}" > torchbricks/VERSION
