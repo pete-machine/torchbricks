@@ -1,9 +1,8 @@
-# torch_bricks
+# torchbricks
 
-[![codecov](https://codecov.io/gh/PeteHeine/torch_bricks/branch/main/graph/badge.svg?token=torch_bricks_token_here)](https://codecov.io/gh/PeteHeine/torch_bricks)
-[![CI](https://github.com/PeteHeine/torch_bricks/actions/workflows/main.yml/badge.svg)](https://github.com/PeteHeine/torch_bricks/actions/workflows/main.yml)
+[![codecov](https://codecov.io/gh/PeteHeine/torchbricks/branch/main/graph/badge.svg?token=torch_bricks_token_here)](https://codecov.io/gh/PeteHeine/torchbricks)
+[![CI](https://github.com/PeteHeine/torchbricks/actions/workflows/main.yml/badge.svg)](https://github.com/PeteHeine/torchbricks/actions/workflows/main.yml)
 
-Awesome torch_bricks created by PeteHeine
 
 ## Install it from PyPI
 
@@ -14,11 +13,7 @@ pip install torch_bricks
 ## Usage
 
 ```py
-from torch_bricks import BaseClass
-from torch_bricks import base_function
-
-BaseClass().base_method()
-base_function()
+## MISSING
 ```
 
 ```bash
