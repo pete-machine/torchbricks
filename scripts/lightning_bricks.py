@@ -72,7 +72,6 @@ if __name__ == '__main__':
                                                        create_lr_scheduler_func=create_lr_scheduler)
     logger = WandbLogger(name=experiment_name, project=PROJECT)
     trainer = Trainer(accelerator=args.accelerator, logger=logger, max_epochs=args.max_epochs)
-    # trainer.logger.log_hyperparams(cfg_log)
     trainer.fit(bricks_lightning_module,
                 train_dataloaders=data_module.train_dataloader(),
                 val_dataloaders=data_module.val_dataloader())

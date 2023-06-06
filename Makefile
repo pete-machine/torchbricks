@@ -1,5 +1,5 @@
 .ONESHELL:
-PYTHONPATH=PYTHONPATH=$(shell pwd)/src
+PYTHONPATH=PYTHONPATH=$(shell pwd)/src:$(shell pwd)/tests
 
 .PHONY: help
 help:             ## Show the help.
@@ -34,6 +34,11 @@ test:        	  ## Run tests and generate coverage report.
 	coverage xml
 	coverage html
 
+
+.PHONY: test_training
+test_training:    ## Run CIFAR10 training
+	@set -e
+	$(PYTHONPATH) python scripts/lightning_bricks.py --batch_size 256 --num_workers 10 --max_epochs 20 --accelerator gpu
 
 .PHONY: watch
 watch:            ## Run tests on every change.
