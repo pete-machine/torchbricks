@@ -41,7 +41,7 @@ def create_brick_collection(num_classes: int, num_backbone_featues: int) -> Dict
     brick_collections = {
         'preprocessor': bricks.BrickNotTrainable(Preprocessor(), input_names=['raw'], output_names=['preprocessed']),
         'backbone': bricks.BrickTrainable(TinyBackbone(n_kernels=num_backbone_featues), input_names=['preprocessed'],
-                                                output_names=['features']),
+                                                       output_names=['features']),
         'classifier': bricks.BrickTrainable(Classifier(input_channels=num_backbone_featues, num_classes=num_classes),
                                             input_names=['features'],
                                             output_names=['predictions']),
@@ -53,16 +53,118 @@ def create_brick_collection(num_classes: int, num_backbone_featues: int) -> Dict
 
 def test_brick_collection():
     num_classes = 10
-    num_backbone_featues = 5
-
-    brick_collection = create_brick_collection(num_classes=num_classes, num_backbone_featues=num_backbone_featues)
-
+    expected_forward_named_outputs = {'labels', 'raw', 'phase', 'preprocessed', 'features', 'predictions'}
+    expected_named_losses = {'ce_loss'}
+    expected_named_metrics = {'train/Accuracy', 'train/Concatenate', 'train/ConfMat', 'train/MeanAccuracy'}
+    brick_collection = create_brick_collection(num_classes=num_classes, num_backbone_featues=5)
     model = bricks.BrickCollection(bricks=brick_collection)
-    named_tensors = {'labels': torch.tensor(range(num_classes), dtype=torch.float64), 'raw': torch.zeros((3, 24, 24))}
+    named_inputs = {'labels': torch.tensor(range(num_classes), dtype=torch.float64), 'raw': torch.zeros((3, 24, 24))}
 
     phase = Phase.TRAIN
-    model(phase=phase, named_tensors=named_tensors)
-    model.on_step(phase=phase, named_tensors=named_tensors, batch_idx=0)
-    model.on_step(phase=phase, named_tensors=named_tensors, batch_idx=0)
-    model.on_step(phase=phase, named_tensors=named_tensors, batch_idx=0)
-    model.summarize(phase=phase, reset=True)
+    model(phase=phase, named_inputs=named_inputs)
+    model.on_step(phase=phase, named_inputs=named_inputs, batch_idx=0)
+    model.on_step(phase=phase, named_inputs=named_inputs, batch_idx=1)
+    named_outputs, losses = model.on_step(phase=phase, named_inputs=named_inputs, batch_idx=2)
+    metrics = model.summarize(phase=phase, reset=True)
+
+    assert set(metrics) == expected_named_metrics
+    assert expected_forward_named_outputs.union(expected_named_losses) == set(named_outputs)
+    assert expected_named_losses == set(losses)
+
+
+def test_brick_collection_no_metrics():
+    num_classes = 10
+    expected_forward_named_outputs = {'labels', 'raw', 'phase', 'preprocessed', 'features', 'predictions'}
+    expected_named_losses = {'ce_loss'}
+    expected_named_metrics = {}
+
+    brick_collection = create_brick_collection(num_classes=num_classes, num_backbone_featues=5)
+    brick_collection = {name: brick for name, brick in brick_collection.items() if not isinstance(brick, bricks.BrickTorchMetric)}
+    model = bricks.BrickCollection(bricks=brick_collection)
+
+    named_inputs = {'labels': torch.tensor(range(num_classes), dtype=torch.float64), 'raw': torch.zeros((3, 24, 24))}
+    phase = Phase.TRAIN
+    named_outputs = model(phase=phase, named_inputs=named_inputs)
+    assert expected_forward_named_outputs == set(named_outputs)
+
+    model.on_step(phase=phase, named_inputs=named_inputs, batch_idx=0)
+    model.on_step(phase=phase, named_inputs=named_inputs, batch_idx=1)
+    named_outputs, losses = model.on_step(phase=phase, named_inputs=named_inputs, batch_idx=2)
+    metrics = model.summarize(phase=phase, reset=True)
+    assert metrics == expected_named_metrics
+    assert expected_forward_named_outputs.union(expected_named_losses) == set(named_outputs)
+    assert expected_named_losses == set(losses)
+
+
+def test_brick_collection_no_metrics_no_losses():
+    num_classes = 10
+    expected_forward_named_outputs = {'labels', 'raw', 'phase', 'preprocessed', 'features', 'predictions'}
+    expected_named_losses = {}
+    expected_named_metrics = {}
+
+    brick_collection = create_brick_collection(num_classes=num_classes, num_backbone_featues=5)
+    brick_collection = {name: brick for name, brick in brick_collection.items() if not isinstance(brick, bricks.BrickTorchMetric)}
+    brick_collection = {name: brick for name, brick in brick_collection.items() if not isinstance(brick, bricks.BrickLoss)}
+    model = bricks.BrickCollection(bricks=brick_collection)
+
+    named_inputs = {'labels': torch.tensor(range(num_classes), dtype=torch.float64), 'raw': torch.zeros((3, 24, 24))}
+    phase = Phase.TRAIN
+    named_outputs = model(phase=phase, named_inputs=named_inputs)
+    assert expected_forward_named_outputs == set(named_outputs)
+
+    model.on_step(phase=phase, named_inputs=named_inputs, batch_idx=0)
+    model.on_step(phase=phase, named_inputs=named_inputs, batch_idx=1)
+    named_outputs, losses = model.on_step(phase=phase, named_inputs=named_inputs, batch_idx=2)
+    metrics = model.summarize(phase=phase, reset=True)
+    assert metrics == expected_named_metrics
+    assert expected_forward_named_outputs.union(expected_named_losses) == set(named_outputs)
+    assert expected_named_losses == losses
+
+def test_nested_bricks():
+
+    class PreprocessorHalf(nn.Module):
+        def forward(self, raw_input: torch.Tensor) -> torch.Tensor:
+            return raw_input/2
+
+    class PreprocessorSquareRoot(nn.Module):
+        def forward(self, raw_input: torch.Tensor) -> torch.Tensor:
+            return torch.sqrt(raw_input)
+
+    def root_bricks():
+        return {
+            'preprocessor0': bricks.BrickNotTrainable(PreprocessorHalf(), input_names=['in0'], output_names=['out1']),
+            'preprocessor1': bricks.BrickNotTrainable(PreprocessorHalf(), input_names=['out1'], output_names=['out2'])
+            }
+
+    def nested_bricks():
+        return {
+            'preprocessor11': bricks.BrickNotTrainable(PreprocessorSquareRoot(), input_names=['out2'], output_names=['out3']),
+            'preprocessor12': bricks.BrickNotTrainable(PreprocessorSquareRoot(), input_names=['out3'], output_names=['out4']),
+        }
+
+    # Nested bricks using nested brick collections
+    nested_brick_collection = root_bricks()
+    nested_brick_collection['collection'] = bricks.BrickCollection(nested_bricks())
+    brick_collection = bricks.BrickCollection(bricks=nested_brick_collection)
+
+    # Nested bricks using nested dictionary of bricks
+    nested_brick_dict = root_bricks()
+    nested_brick_dict['collection'] = nested_bricks()
+    brick_collection_dict = bricks.BrickCollection(bricks=nested_brick_dict)
+
+    # No nesting of bricks in flat/single level dictionary
+    flat_brick_dict = root_bricks()
+    flat_brick_dict.update(nested_bricks())
+    brick_collection_flat = bricks.BrickCollection(bricks=nested_brick_dict)
+
+    named_inputs = {'in0': torch.tensor(range(10), dtype=torch.float64)}
+    outputs0 = brick_collection(named_inputs=named_inputs, phase=Phase.TRAIN)
+    outputs1 = brick_collection_dict(named_inputs=named_inputs, phase=Phase.TRAIN)
+    outputs2 = brick_collection_flat(named_inputs=named_inputs, phase=Phase.TRAIN)
+    assert outputs0 == outputs1 == outputs2
+
+
+    outputs0 = brick_collection.on_step(named_inputs=named_inputs, phase=Phase.TRAIN, batch_idx=0)
+    outputs1 = brick_collection_dict.on_step(named_inputs=named_inputs, phase=Phase.TRAIN, batch_idx=0)
+    outputs2 = brick_collection_flat.on_step(named_inputs=named_inputs, phase=Phase.TRAIN, batch_idx=0)
+    assert outputs0 == outputs1 == outputs2

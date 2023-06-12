@@ -50,17 +50,17 @@ if __name__ == '__main__':
     train_dataloader = data_module.train_dataloader()
     n_steps_per_epoch = len(train_dataloader)
     for batch in train_dataloader:
-        named_tensors = {'raw': batch[0], 'targets': batch[1]}
+        named_inputs = {'raw': batch[0], 'targets': batch[1]}
         break
     brick_collection = BrickCollection(create_cifar_bricks(num_classes=num_classes))
-    named_tensors, loss = brick_collection.on_step(phase=Phase.TRAIN, named_tensors=named_tensors, batch_idx=0)
-    named_tensors, loss = brick_collection.on_step(phase=Phase.TRAIN, named_tensors=named_tensors, batch_idx=0)
-    named_tensors, loss = brick_collection.on_step(phase=Phase.TRAIN, named_tensors=named_tensors, batch_idx=0)
+    named_outputs, loss = brick_collection.on_step(phase=Phase.TRAIN, named_inputs=named_inputs, batch_idx=0)
+    named_outputs, loss = brick_collection.on_step(phase=Phase.TRAIN, named_inputs=named_inputs, batch_idx=0)
+    named_outputs, loss = brick_collection.on_step(phase=Phase.TRAIN, named_inputs=named_inputs, batch_idx=0)
     metrics_train = brick_collection.summarize(phase=Phase.TRAIN, reset=True)
 
     # Forward only runs inference stuff. No metrics, no losses and does not require targets.
-    named_tensors_no_target = named_tensors = {'raw': batch[0]}
-    brick_collection(phase=Phase.TEST, named_tensors=named_tensors_no_target)
+    named_inputs_no_target = {'raw': batch[0]}
+    brick_collection(phase=Phase.TEST, named_inputs=named_inputs_no_target)
 
     create_opimtizer_func = partial(torch.optim.SGD, lr=0.05, momentum=0.9, weight_decay=5e-4)
     create_lr_scheduler = partial(create_lr_schedular_one_cycle_lr, max_epochs=args.max_epochs, steps_per_epoch=n_steps_per_epoch)

@@ -75,6 +75,9 @@ clean:                   ## Clean unused files.
 
 .PHONY: release
 release:          ## Create a new tag for release.
+# bumpver update --patch
+# git push origin 0.0.5
+
 # 	@echo "WARNING: This operation will create s version tag and push to github"
 # 	@read -p "Version? (provide the next x.y.z semver) : " TAG
 # 	@echo "$${TAG}" > torchbricks/VERSION

@@ -26,7 +26,7 @@ bricks = {
 
 # Executing model
 model = BrickCollection(bricks)
-outputs = model(named_tensors={"raw": input_images}, phase=Phase.TRAIN)
+outputs = model(named_inputs={"raw": input_images}, phase=Phase.TRAIN)
 
 print(outputs.keys())
 "raw", "processed", "embedding", "logits"
@@ -53,7 +53,7 @@ bricks["semantic_segmentation"] = BrickTrainable(SegmentationClassifier(), input
 
 # Executing model
 model = BrickCollection(bricks)
-outputs = model(named_tensors={"raw": input_images}, phase=Phase.TRAIN)
+outputs = model(named_inputs={"raw": input_images}, phase=Phase.TRAIN)
 
 print(outputs.keys())
 "raw", "processed", "embedding", "embedding_upscaled", "ss_logits"
@@ -84,15 +84,15 @@ bricks["loss"] = BrickLoss(model=nn.CrossEntropyLoss(), input_names=['logits', '
 
 # We can still run the forward-pass as before - Note: The forward call does not require 'targets'
 model = BrickCollection(bricks)
-outputs = model(named_tensors={"raw": input_images}, phase=Phase.TRAIN)
+outputs = model(named_inputs={"raw": input_images}, phase=Phase.TRAIN)
 print(outputs.keys())
 "raw", "processed", "embedding", "logits"
 
 # Example of running `on_step`. Note: `on_step` requires `targets` to calculate metrics and loss.
-named_tensors = {"raw": input_images, "targets": targets}
-named_outputs, losses = model.on_step(phase=Phase.TRAIN, named_tensors=named_tensors, batch_idx=0)
-named_outputs, losses = model.on_step(phase=Phase.TRAIN, named_tensors=named_tensors, batch_idx=1)
-named_outputs, losses = model.on_step(phase=Phase.TRAIN, named_tensors=named_tensors, batch_idx=2)
+named_inputs = {"raw": input_images, "targets": targets}
+named_outputs, losses = model.on_step(phase=Phase.TRAIN, named_inputs=named_inputs, batch_idx=0)
+named_outputs, losses = model.on_step(phase=Phase.TRAIN, named_inputs=named_inputs, batch_idx=1)
+named_outputs, losses = model.on_step(phase=Phase.TRAIN, named_inputs=named_inputs, batch_idx=2)
 metrics = model.summarize(phase=Phase.TRAIN, reset=True)
 ```
 
@@ -160,9 +160,12 @@ MISSING
 - [ ] Support preparing data in the dataloader?
 - [ ] Make common Visualizations with pillow - not opencv to not blow up the required dependencies. ImageClassification, Segmentation, ObjectDetection
 - [ ] Make an export to onnx function and add it to the README.md
-- [ ] Minor: BrickCollections supports passing a dictionary with BrickCollections. But we should also convert a nested dictionary into a nested brick collections
+- [ ] Proper handling of train, val and test. What to do with gradients, nn.Module parameters and internal eval/train state
+- [ ] Consider: If train, val and test phase has no impact on bricks, it should be passed as a regular named input.
+- [x] Minor: BrickCollections supports passing a dictionary with BrickCollections. But we should also convert a nested dictionary into a nested brick collections
 - [ ] Minor: Currently, `input_names` and `output_names` support positional arguments, but we should also support keyword arguments.
-- [ ]
+- [x] Minor: Make Brick an abstract class
+
 
 ## How does it really work?
 ????
