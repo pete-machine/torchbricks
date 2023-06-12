@@ -139,7 +139,7 @@ def create_cifar_bricks(num_classes: int) -> Dict[str, Brick]:
         'backbone': BrickTrainable(backbone, input_names=['normalized'], output_names=['backbone']),
         'classifier': BrickTrainable(Classifier(num_classes=num_classes, n_features=backbone.n_backbone_features),
                                      input_names=['backbone'], output_names=['logits', 'probabilities', 'class_prediction']),
-        'loss_bce': BrickLoss(model=nn.CrossEntropyLoss(), input_names=['logits', 'targets'], output_names=['loss_bce']),
+        'loss_ce': BrickLoss(model=nn.CrossEntropyLoss(), input_names=['logits', 'targets'], output_names=['loss_ce']),
         'metrics_classification': BrickTorchMetric(metric=metric_collection,
                                                    input_names=['class_prediction', 'targets'],  metric_name=''),
     }
