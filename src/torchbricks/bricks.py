@@ -1,9 +1,11 @@
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Callable, Dict, Any, List, Tuple, Union
+from typing import Dict, Any, List, Tuple, Union
 import torch
 from torch import nn
 from torchmetrics import MetricCollection, Metric
+
+from torchbricks.bricks_helper import named_input_and_outputs_callable, select_inputs_by_name
 
 
 class Phase(Enum):              # Gradients/backward  Eval-model    Targets
@@ -12,32 +14,6 @@ class Phase(Enum):              # Gradients/backward  Eval-model    Targets
     TEST = 'test'               # N                   N             Y
     INFERENCE = 'inference'     # N                   N             N
 
-
-def select_inputs(named_inputs: Dict[str, Any], input_names: List[str]) -> List:
-    is_subset = set(input_names).issubset(named_inputs)
-    assert is_subset, (f"Not all expected '{input_names=}' exists in 'named_inputs={list(named_inputs)}'. The following expected names "
-                       f"'{list(set(input_names).difference(named_inputs))}' does not exist in the dictionary of 'named tensors'")
-    selected_inputs = [named_inputs[name] for name in input_names]
-    return selected_inputs
-
-
-def name_callable_outputs(outputs: Any, output_names: List[str]) -> Dict[str, Any]:
-    if not isinstance(outputs, Tuple):
-        outputs = (outputs, )
-    assert len(outputs) == len(output_names)
-    return dict(zip(output_names, outputs))
-
-
-def named_input_and_outputs_callable(callable: Callable,
-                                     named_inputs: Dict[str, Any],
-                                     input_names: List[str] | Dict[str, Any],
-                                     output_names: List[str] | Dict[str, Any]) -> Dict[str, Any]:
-    if isinstance(input_names, dict) or isinstance(output_names, dict):
-        raise ValueError('Dicts are not supported yet')
-
-    selected_inputs = select_inputs(named_inputs, input_names=input_names)
-    outputs = callable(*selected_inputs)
-    return name_callable_outputs(outputs=outputs, output_names=output_names)
 
 class Brick(nn.Module, ABC):
 
@@ -60,7 +36,6 @@ class Brick(nn.Module, ABC):
     def summarize(self, phase: Phase, reset: bool) -> Dict[str, Any]:
         """"""
         raise ValueError(f"If you are not using 'summarize' then set it to 'summarize=None' in class {self}")
-        return {}
 
     def on_step(self, phase: Phase, named_inputs: Dict[str, Any], batch_idx: int) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         named_inputs = self.forward(phase=phase, named_inputs=named_inputs)
@@ -126,7 +101,9 @@ class BrickTrainable(Brick):
     update_metrics = None
     summarize = None
 
-    def __init__(self, model: nn.Module, input_names: List[str], output_names: List[str]):
+    def __init__(self, model: nn.Module,
+                 input_names: Union[List[str], Dict[str, str]],
+                 output_names: List[str]):
         super().__init__()
         self.input_names = input_names
         self.output_names = output_names
@@ -145,7 +122,9 @@ class BrickNotTrainable(Brick):
     update_metrics = None
     summarize = None
 
-    def __init__(self, model: nn.Module, input_names: List[str], output_names: List[str]):
+    def __init__(self, model: nn.Module,
+                 input_names: Union[List[str], Dict[str, str]],
+                 output_names: List[str]):
         super().__init__()
         self.input_names = input_names
         self.output_names = output_names
@@ -167,7 +146,9 @@ class BrickLoss(Brick):
     update_metrics = None
     summarize = None
 
-    def __init__(self, model: nn.Module, input_names: List[str], output_names: List[str]):
+    def __init__(self, model: nn.Module,
+                 input_names: Union[List[str], Dict[str, str]],
+                 output_names: List[str]):
         super().__init__()
         self.model = model
         self.input_names = input_names
@@ -184,7 +165,9 @@ class BrickTorchMetric(Brick):
     forward = None
     calculate_loss = None
 
-    def __init__(self, metric: MetricCollection | Metric, input_names: List[str], metric_name: str = ''):
+    def __init__(self, metric: Union[MetricCollection, Metric],
+                 input_names: Union[List[str], Dict[str, str]],
+                 metric_name: str = ''):
         super().__init__()
         self.input_names = input_names
         val_args = {}
@@ -211,10 +194,13 @@ class BrickTorchMetric(Brick):
     def get_metric_name(phase: Phase, metric_name: str) -> str:
         return f'{phase.value}/{metric_name}'
 
-    def update_metrics(self, phase: Phase, named_inputs: Dict[str, Any], batch_idx: int) -> None:
+    def update_metrics(self,
+                       phase: Phase,
+                       named_inputs: Union[List[str], Dict[str, str]],
+                       batch_idx: int) -> None:
         metric = self._select_metric_collection_from_split(phase=phase)
         named_inputs['phase'] = phase
-        selected_inputs = select_inputs(named_inputs, input_names=self.input_names)
+        selected_inputs = select_inputs_by_name(named_inputs, input_names=self.input_names)
         metric.update(*selected_inputs)
 
     def summarize(self, phase: Phase, reset: bool):

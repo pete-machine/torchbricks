@@ -163,7 +163,7 @@ MISSING
 - [ ] Proper handling of train, val and test. What to do with gradients, nn.Module parameters and internal eval/train state
 - [ ] Consider: If train, val and test phase has no impact on bricks, it should be passed as a regular named input.
 - [x] Minor: BrickCollections supports passing a dictionary with BrickCollections. But we should also convert a nested dictionary into a nested brick collections
-- [ ] Minor: Currently, `input_names` and `output_names` support positional arguments, but we should also support keyword arguments.
+- [x] Minor: Currently, `input_names` and `output_names` support positional arguments, but we should also support keyword arguments.
 - [x] Minor: Make Brick an abstract class
 - [ ] Test: Make it optional if gradients can be passed through NonTrainableBrick without weights being optimized
 
