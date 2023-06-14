@@ -165,6 +165,7 @@ MISSING
 - [x] Minor: BrickCollections supports passing a dictionary with BrickCollections. But we should also convert a nested dictionary into a nested brick collections
 - [ ] Minor: Currently, `input_names` and `output_names` support positional arguments, but we should also support keyword arguments.
 - [x] Minor: Make Brick an abstract class
+- [ ] Test: Make it optional if gradients can be passed through NonTrainableBrick without weights being optimized
 
 
 ## How does it really work?

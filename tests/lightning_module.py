@@ -134,15 +134,20 @@ def create_cifar_bricks(num_classes: int) -> Dict[str, Brick]:
         'ConfMat': torchmetrics.ConfusionMatrix(task='multiclass', num_classes=num_classes),
         'Concatenate': ConcatenatePredictionAndTarget(compute_on_cpu=True)
     })
+
+
     named_bricks = {
         'preprocessor': BrickNotTrainable(PreprocessorCifar10(), input_names=['raw'], output_names=['normalized']),
         'backbone': BrickTrainable(backbone, input_names=['normalized'], output_names=['backbone']),
+    }
+
+    named_bricks['task_classifier'] = {
         'classifier': BrickTrainable(Classifier(num_classes=num_classes, n_features=backbone.n_backbone_features),
                                      input_names=['backbone'], output_names=['logits', 'probabilities', 'class_prediction']),
         'loss_ce': BrickLoss(model=nn.CrossEntropyLoss(), input_names=['logits', 'targets'], output_names=['loss_ce']),
         'metrics_classification': BrickTorchMetric(metric=metric_collection,
                                                    input_names=['class_prediction', 'targets'],  metric_name=''),
-    }
+        }
     return named_bricks
 
 

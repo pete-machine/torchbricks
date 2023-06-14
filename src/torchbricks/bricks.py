@@ -72,11 +72,11 @@ class Brick(nn.Module, ABC):
         return named_inputs, losses
 
 
-def convert_dict_to_nested_brick_collection(bricks: Dict[str, Union[Brick, Dict]], level=0):
+def convert_nested_dict_to_nested_brick_collection(bricks: Dict[str, Union[Brick, Dict]], level=0):
     converted_bricks = {}
     for name, brick in bricks.items():
         if isinstance(brick, dict):
-            converted_bricks[name] = convert_dict_to_nested_brick_collection(brick, level=level+1)
+            converted_bricks[name] = convert_nested_dict_to_nested_brick_collection(brick, level=level+1)
         else:
             converted_bricks[name] = brick
 
@@ -86,13 +86,13 @@ def convert_dict_to_nested_brick_collection(bricks: Dict[str, Union[Brick, Dict]
         return BrickCollection(converted_bricks)
 
 
-class BrickCollection(Brick):
+class BrickCollection(nn.ModuleDict, Brick):  # Note BrickCollection is inherently ModuleDict and acts as a dictionary of modules
     def __init__(self, bricks: Dict[str, Brick]) -> None:
-        super().__init__()
-        self.bricks = nn.ModuleDict(convert_dict_to_nested_brick_collection(bricks))
+        super().__init__(convert_nested_dict_to_nested_brick_collection(bricks))
 
     def forward(self, phase: Phase, named_inputs: Dict[str, Any]) -> Dict[str, Any]:
-        forward_bricks = [brick for brick in self.bricks.values() if brick.forward is not None]
+        named_inputs = dict(named_inputs)  # To keep `named_inputs` unchanged
+        forward_bricks = [brick for brick in self.values() if brick.forward is not None]
         for brick in forward_bricks:
             results = brick.forward(phase=phase, named_inputs=named_inputs)
             if results is None:
@@ -101,7 +101,7 @@ class BrickCollection(Brick):
         return named_inputs
 
     def calculate_loss(self, named_inputs: Dict[str, Any]) -> Dict[str, Any]:
-        loss_bricks = [brick for brick in self.bricks.values() if brick.calculate_loss is not None]
+        loss_bricks = [brick for brick in self.values() if brick.calculate_loss is not None]
         losses = {}
         for brick in loss_bricks:
             if brick.calculate_loss is not None:
@@ -109,12 +109,12 @@ class BrickCollection(Brick):
         return losses
 
     def update_metrics(self, phase: Phase, named_inputs: Dict[str, Any], batch_idx: int) -> None:
-        update_metrics_bricks = [brick for brick in self.bricks.values() if brick.update_metrics is not None]
+        update_metrics_bricks = [brick for brick in self.values() if brick.update_metrics is not None]
         for brick in update_metrics_bricks:
             brick.update_metrics(phase=phase, named_inputs=named_inputs, batch_idx=batch_idx)
 
     def summarize(self, phase: Phase, reset: bool) -> Dict[str, Any]:
-        update_metrics_bricks = [brick for brick in self.bricks.values() if brick.summarize is not None]
+        update_metrics_bricks = [brick for brick in self.values() if brick.summarize is not None]
         metrics = {}
         for brick in update_metrics_bricks:
             metrics.update(brick.summarize(phase=phase, reset=reset))

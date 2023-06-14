@@ -157,14 +157,35 @@ def test_nested_bricks():
     flat_brick_dict.update(nested_bricks())
     brick_collection_flat = bricks.BrickCollection(bricks=nested_brick_dict)
 
+
     named_inputs = {'in0': torch.tensor(range(10), dtype=torch.float64)}
     outputs0 = brick_collection(named_inputs=named_inputs, phase=Phase.TRAIN)
     outputs1 = brick_collection_dict(named_inputs=named_inputs, phase=Phase.TRAIN)
     outputs2 = brick_collection_flat(named_inputs=named_inputs, phase=Phase.TRAIN)
-    assert outputs0 == outputs1 == outputs2
+    assert_equal_dictionaries(outputs0, outputs1)
+    assert_equal_dictionaries(outputs1, outputs2)
+
+    expected_outputs = dict(named_inputs)
+    expected_outputs['out1'] = expected_outputs['in0']/2
+    expected_outputs['out2'] = expected_outputs['out1']/2
+    expected_outputs['out3'] = torch.sqrt(expected_outputs['out2'])
+    expected_outputs['out4'] = torch.sqrt(expected_outputs['out3'])
+    outputs0.pop('phase')
+    assert_equal_dictionaries(outputs0, expected_outputs)
 
 
-    outputs0 = brick_collection.on_step(named_inputs=named_inputs, phase=Phase.TRAIN, batch_idx=0)
-    outputs1 = brick_collection_dict.on_step(named_inputs=named_inputs, phase=Phase.TRAIN, batch_idx=0)
-    outputs2 = brick_collection_flat.on_step(named_inputs=named_inputs, phase=Phase.TRAIN, batch_idx=0)
-    assert outputs0 == outputs1 == outputs2
+    outputs0, _ = brick_collection.on_step(named_inputs=named_inputs, phase=Phase.TRAIN, batch_idx=0)
+    outputs1, _ = brick_collection_dict.on_step(named_inputs=named_inputs, phase=Phase.TRAIN, batch_idx=0)
+    outputs2, _ = brick_collection_flat.on_step(named_inputs=named_inputs, phase=Phase.TRAIN, batch_idx=0)
+
+    assert_equal_dictionaries(outputs0, outputs1)
+    assert_equal_dictionaries(outputs1, outputs2)
+
+
+def assert_equal_dictionaries(d0, d1):
+    assert set(d0) == set(d1)
+    for key, values in d0.items():
+        if isinstance(values, torch.Tensor):
+            assert torch.equal(values, d1[key])
+        else:
+            assert values == d1[key]
