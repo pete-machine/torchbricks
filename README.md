@@ -165,6 +165,7 @@ MISSING
 - [x] Minor: BrickCollections supports passing a dictionary with BrickCollections. But we should also convert a nested dictionary into a nested brick collections
 - [x] Minor: Currently, `input_names` and `output_names` support positional arguments, but we should also support keyword arguments.
 - [x] Minor: Make Brick an abstract class
+- [x] Convert torchvision resnet models to only a backbone brick.
 - [ ] Test: Make it optional if gradients can be passed through NonTrainableBrick without weights being optimized
 
 

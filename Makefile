@@ -39,10 +39,10 @@ test:        	         ## Run tests and generate coverage report.
 	coverage html
 
 
-.PHONY: test_training
-test_training:           ## Run CIFAR10 training
+.PHONY: train-cifar10
+train-cifar10:           ## Run CIFAR10 training
 	@set -e
-	$(PYTHONPATH) python scripts/lightning_bricks.py --batch_size 256 --num_workers 10 --max_epochs 20 --accelerator gpu
+	$(PYTHONPATH) python scripts/train_lightning_cifar10.py --batch_size 256 --num_workers 10 --max_epochs 20 --accelerator gpu
 
 .PHONY: watch
 watch:                   ## Run tests on every change.
