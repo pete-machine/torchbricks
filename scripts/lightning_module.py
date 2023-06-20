@@ -11,17 +11,14 @@ class LightningBrickCollection(LightningModule):
     def __init__(self, path_experiments: Path,
                  experiment_name: str,
                  brick_collection: BrickCollection,
-                 create_optimizer_func: Callable,
-                 create_lr_scheduler_func: Callable = None):
+                 create_optimizers_func: Callable):
         super().__init__()
 
         self.path_experiment = path_experiments / experiment_name
         self.path_experiment.mkdir()
 
         self.bricks = brick_collection
-        self.create_optimizer_func = create_optimizer_func
-        self.create_lr_scheduler_func = create_lr_scheduler_func
-
+        self.create_optimizers_func = create_optimizers_func
 
     def _on_epoch_end(self, phase: Phase):
         metrics = self.bricks.summarize(phase=phase, reset=True)
@@ -60,9 +57,4 @@ class LightningBrickCollection(LightningModule):
         self._on_epoch_end(phase=Phase.TEST)
 
     def configure_optimizers(self):
-        optimizer = self.create_optimizer_func(self.parameters())
-        optimizers = {
-            'optimizer': optimizer,
-            'lr_scheduler': self.create_lr_scheduler_func(optimizer)
-            }
-        return optimizers
+        return self.create_optimizers_func(self.parameters())

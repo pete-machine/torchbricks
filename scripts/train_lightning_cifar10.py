@@ -11,11 +11,10 @@ from torch.utils.data import DataLoader, random_split
 import torchmetrics
 from torchmetrics import classification
 import torchvision
-from functools import partial
 
 from torchvision import datasets, transforms
 from lightning_module import LightningBrickCollection
-from torchbricks.bag_of_bricks import convert_resnet_to_backbone_brick
+from torchbricks.bag_of_bricks import resnet_to_brick
 from torchbricks.bag_of_bricks import ImageClassifier
 
 from torchbricks.bricks import Brick, BrickCollection, BrickLoss, BrickNotTrainable, BrickTorchMetric, BrickTrainable, Phase
@@ -92,7 +91,7 @@ def create_cifar_bricks(num_classes: int) -> Dict[str, Brick]:
 
     named_bricks = {
         'preprocessor': BrickNotTrainable(PreprocessorCifar10(), input_names=['raw'], output_names=['normalized']),
-        'backbone': convert_resnet_to_backbone_brick(resnet=create_resnet_18(num_classes=num_classes),
+        'backbone': resnet_to_brick(resnet=create_resnet_18(num_classes=num_classes),
                                                      input_name='normalized',
                                                      output_name='features'),
     }
@@ -128,6 +127,19 @@ def create_lr_schedular_one_cycle_lr(optimizer, max_epochs: int, steps_per_epoch
     }
     return scheduler_dict
 
+
+def create_optimizers(model_parameters,
+                      max_epochs: int,
+                      n_steps_per_epoch: int,
+                      lr: float = 0.05,
+                      momentum: float = 0.9,
+                      weight_decay: float = 5e-4):
+    optimizer = torch.optim.SGD(model_parameters, lr=lr, momentum=momentum, weight_decay=weight_decay)
+    lr_scheduler = create_lr_schedular_one_cycle_lr(optimizer=optimizer, max_epochs=max_epochs, steps_per_epoch=n_steps_per_epoch)
+    return {
+            'optimizer': optimizer,
+            'lr_scheduler': lr_scheduler,
+            }
 
 
 if __name__ == '__main__':
@@ -180,14 +192,14 @@ if __name__ == '__main__':
     named_inputs_no_target = {'raw': batch[0]}
     brick_collection(phase=Phase.TEST, named_inputs=named_inputs_no_target)
 
-    create_opimtizer_func = partial(torch.optim.SGD, lr=0.05, momentum=0.9, weight_decay=5e-4)
-    create_lr_scheduler = partial(create_lr_schedular_one_cycle_lr, max_epochs=args.max_epochs, steps_per_epoch=n_steps_per_epoch)
+    def create_optimizers_func(params):
+        return create_optimizers(model_parameters=params, max_epochs=args.num_workers, n_steps_per_epoch=n_steps_per_epoch)
+
     path_experiments = Path('runs')
     bricks_lightning_module = LightningBrickCollection(path_experiments=path_experiments,
                                                        experiment_name=experiment_name,
                                                        brick_collection=brick_collection,
-                                                       create_optimizer_func=create_opimtizer_func,
-                                                       create_lr_scheduler_func=create_lr_scheduler)
+                                                       create_optimizers_func=create_optimizers_func)
     logger = WandbLogger(name=experiment_name, project=PROJECT)
     trainer = Trainer(accelerator=args.accelerator, logger=logger, max_epochs=args.max_epochs)
     trainer.fit(bricks_lightning_module,

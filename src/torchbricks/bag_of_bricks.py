@@ -5,7 +5,7 @@ from torchvision.models import ResNet
 
 from torchbricks.bricks import BrickTrainable
 
-def convert_resnet_to_backbone_brick(resnet: ResNet, input_name: str, output_name: str):
+def resnet_to_brick(resnet: ResNet, input_name: str, output_name: str):
     """Function to convert a torchvision resnet model and convert it to a torch model"""
     return BrickTrainable(model=BackboneResnet(resnet), input_names=[input_name], output_names=[output_name])
 
@@ -16,6 +16,7 @@ class BackboneResnet(nn.Module):
         self.n_backbone_features = list(resnet.layer4.children())[-1].conv1.weight.shape[1]
 
     def forward(self, x: Tensor) -> Tensor:
+        # Similar to 'torchvision/models/resnet.py' but without the final average pooling and classification layers
         x = self.resnet.conv1(x)
         x = self.resnet.bn1(x)
         x = self.resnet.relu(x)
@@ -59,6 +60,7 @@ class LeNet5(nn.Module):
 
 
 class ImageClassifier(nn.Module):
+    """"""
     def __init__(self, num_classes: int, n_features: int, use_average_pooling: bool = True) -> None:
         super().__init__()
         self.fc = nn.Linear(n_features, num_classes)

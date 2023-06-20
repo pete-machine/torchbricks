@@ -10,27 +10,54 @@ The concept is simple and flexible and allows you to more easily combine and swa
 ## Basic use-case: Image classification
 Let us see it in action:
 
-```py
-from torchbricks.bricks import BrickCollection, BrickNotTrainable, BrickTrainable, Phase
+First we specify regular pytorch modules: A preprocessor, a model and a classifier
 
+```py
 class Preprocessor(nn.Module):
     def forward(self, raw_input: torch.Tensor) -> torch.Tensor:
         return raw_input/2
 
-# Defining model
+class TinyModel(nn.Module):
+    def __init__(self, n_channels: int, n_features: int) -> None:
+        super().__init__()
+        self.conv = nn.Conv2d(n_channels, n_features, 1)
+
+    def forward(self, tensor: torch.Tensor) -> torch.Tensor:
+        return self.conv(tensor)
+
+class Classifier(nn.Module):
+    def __init__(self, num_classes: int, in_features: int) -> None:
+        super().__init__()
+        self.fc = nn.Linear(in_features, num_classes)
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+
+    def forward(self, tensor: torch.Tensor) -> torch.Tensor:
+        return self.fc(torch.flatten(self.avgpool(tensor)))
+```
+
+With torchbricks, we can now define how the modules are connected using input and output names of each module.
+Note also that each brick wrapper specifies if the module is trainable (`BrickTrainable`) or not (`BrickNotTrainable`)
+
+```py
+from torchbricks.bricks import BrickCollection, BrickNotTrainable, BrickTrainable, Phase
+
+# Defining model from bricks
 bricks = {
-    "preprocessor": BrickNotTrainable(Preprocessor(), input_names=["raw"], output_names=["processed"])
-    "backbone": BrickTrainable(ResNetBackbone(), input_names=["processed"], output_names=["embedding"])
-    "image_classification": BrickTrainable(ImageClassifier(), input_names=["embedding"], output_names=["logits"])
+    "preprocessor": BrickNotTrainable(Preprocessor(), input_names=["raw"], output_names=["processed"]),
+    "backbone": BrickTrainable(TinyModel(n_channels=3, n_features=10), input_names=["processed"], output_names=["embedding"]),
+    "classifier": BrickTrainable(Classifier(num_classes=3, in_features=10), input_names=["embedding"], output_names=["logits"])
 }
 
 # Executing model
 model = BrickCollection(bricks)
-outputs = model(named_inputs={"raw": input_images}, phase=Phase.TRAIN)
-
+batch_image_example = torch.rand((1, 3, 100, 200))
+outputs = model(named_inputs={"raw": batch_image_example}, phase=Phase.TRAIN)
 print(outputs.keys())
-"raw", "processed", "embedding", "logits"
+dict_keys(['raw', 'processed', 'embedding', 'logits'])
 ```
+Bricks are passed to a `BrickCollection` and executed by passing inputs as a dictionary.
+
+
 Note that we are explicitly passing the required inputs and output names of each brick.
 It is a simple DAG connecting the outputs of one node to inputs of the next node.
 We use `BrickTrainable` and `BrickNotTrainable` bricks to wrap basic `nn.Module`s.
@@ -156,7 +183,7 @@ MISSING
 - [ ] Proper `LightningBrickCollection` for other people to use
 - [ ] Collection of helper modules. Preprocessors, Backbones, Necks/Upsamplers, ImageClassification, SemanticSegmentation, ObjectDetection
   - [ ] All the modules in the README should be easy to import as actually modules.
-  - [ ] Make common brick collections: BricksImageClassification, BricksSegmentation, BricksPointDetection, BricksObejctDetection
+  - [ ] Make common brick collections: BricksImageClassification, BricksSegmentation, BricksPointDetection, BricksObjectDetection
 - [ ] Support preparing data in the dataloader?
 - [ ] Make common Visualizations with pillow - not opencv to not blow up the required dependencies. ImageClassification, Segmentation, ObjectDetection
 - [ ] Make an export to onnx function and add it to the README.md
