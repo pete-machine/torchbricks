@@ -193,7 +193,7 @@ if __name__ == '__main__':
     brick_collection(phase=Phase.TEST, named_inputs=named_inputs_no_target)
 
     def create_optimizers_func(params):
-        return create_optimizers(model_parameters=params, max_epochs=args.num_workers, n_steps_per_epoch=n_steps_per_epoch)
+        return create_optimizers(model_parameters=params, max_epochs=args.max_epochs, n_steps_per_epoch=n_steps_per_epoch)
 
     path_experiments = Path('runs')
     bricks_lightning_module = LightningBrickCollection(path_experiments=path_experiments,
