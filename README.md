@@ -38,23 +38,44 @@ class Classifier(nn.Module):
 With torchbricks, we can now define how the modules are connected using input and output names of each module.
 Note also that each brick wrapper specifies if the module is trainable (`BrickTrainable`) or not (`BrickNotTrainable`)
 
+
+<!--- @get_source_code(test_basic_use_case_image_classification) --->
 ```py
 from torchbricks.bricks import BrickCollection, BrickNotTrainable, BrickTrainable, Phase
 
 # Defining model from bricks
 bricks = {
-    "preprocessor": BrickNotTrainable(Preprocessor(), input_names=["raw"], output_names=["processed"]),
-    "backbone": BrickTrainable(TinyModel(n_channels=3, n_features=10), input_names=["processed"], output_names=["embedding"]),
-    "classifier": BrickTrainable(Classifier(num_classes=3, in_features=10), input_names=["embedding"], output_names=["logits"])
+    'preprocessor': BrickNotTrainable(Preprocessor(), input_names=['raw'], output_names=['processed']),
+    'backbone': BrickTrainable(TinyModel(n_channels=3, n_features=10), input_names=['processed'], output_names=['embedding']),
+    'classifier': BrickTrainable(Classifier(num_classes=3, in_features=10), input_names=['embedding'], output_names=['logits'])
 }
 
 # Executing model
 model = BrickCollection(bricks)
 batch_image_example = torch.rand((1, 3, 100, 200))
-outputs = model(named_inputs={"raw": batch_image_example}, phase=Phase.TRAIN)
+outputs = model(named_inputs={'raw': batch_image_example}, phase=Phase.TRAIN)
 print(outputs.keys())
-dict_keys(['raw', 'processed', 'embedding', 'logits'])
+
 ```
+from torchbricks.bricks import BrickCollection, BrickNotTrainable, BrickTrainable, Phase
+
+# Defining model from bricks
+bricks = {
+    'preprocessor': BrickNotTrainable(Preprocessor(),
+                                      input_names=['raw'], output_names=['processed']),
+    'backbone': BrickTrainable(TinyModel(n_channels=3, n_features=10),
+                               input_names=['processed'], output_names=['embedding']),
+    'classifier': BrickTrainable(Classifier(num_classes=3, in_features=10),
+                                 input_names=['embedding'], output_names=['logits'])
+}
+
+# Executing model
+model = BrickCollection(bricks)
+batch_image_example = torch.rand((1, 3, 100, 200))
+outputs = model(named_inputs={'raw': batch_image_example}, phase=Phase.TRAIN)
+print(outputs.keys())
+
+
 Bricks are passed to a `BrickCollection` and executed by passing inputs as a dictionary.
 
 
@@ -70,6 +91,7 @@ We will get back to that later.
 After running experiments, we now realize that we also wanna do semantic segmentation.
 This is how it would look like:
 
+<!--- @get_source_code(asdf) --->
 ```py
 # We can optionally keep/remove image_classification from before
 bricks.pop("image_classification")
