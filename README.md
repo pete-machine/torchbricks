@@ -39,7 +39,7 @@ With torchbricks, we can now define how the modules are connected using input an
 Note also that each brick wrapper specifies if the module is trainable (`BrickTrainable`) or not (`BrickNotTrainable`)
 
 
-<!--- @get_source_code(test_basic_use_case_image_classification) --->
+<!--- @get_source_code(test_basic_use_case_image_classification) - below code snippet is automatically taken from the specified test --->
 ```py
 from torchbricks.bricks import BrickCollection, BrickNotTrainable, BrickTrainable, Phase
 
