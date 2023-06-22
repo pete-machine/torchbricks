@@ -16,6 +16,8 @@ dependencies:
   - pytorch-lightning=2.0.2
   # - deepdiff=6.3.0
   - wandb=0.15.4
+  - nbmake=1.3.4
+  - nbconvert=7.6.0
 
   # Linting stuff
   - pre-commit=3.3.2
