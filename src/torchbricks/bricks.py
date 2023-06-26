@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Dict, Any, List, Tuple, Union
+from typing import Dict, Any, List, Optional, Tuple, Union
 import torch
 from torch import nn
 from torchmetrics import MetricCollection, Metric
@@ -129,7 +129,8 @@ class BrickNotTrainable(Brick):
         self.input_names = input_names
         self.output_names = output_names
         self.model = model
-        self.model.requires_grad_(False)
+        if hasattr(model, 'requires_grad_'):
+            self.model.requires_grad_(False)
 
     @torch.no_grad()
     def forward(self, phase: Phase, named_inputs: Dict[str, Any]) -> Dict[str, Any]:
@@ -167,19 +168,15 @@ class BrickTorchMetric(Brick):
 
     def __init__(self, metric: Union[MetricCollection, Metric],
                  input_names: Union[List[str], Dict[str, str]],
-                 metric_name: str = ''):
+                 metric_name: Optional[str] = None):
         super().__init__()
         self.input_names = input_names
-        val_args = {}
-        train_args = {}
-        test_args = {}
-        if isinstance(metric, MetricCollection):
-            train_args['prefix'] = self.get_metric_name(Phase.TRAIN, metric_name=metric_name)
-            val_args['prefix'] = self.get_metric_name(Phase.VALIDATION, metric_name=metric_name)
-            test_args['prefix'] = self.get_metric_name(Phase.TEST, metric_name=metric_name)
-        self.metrics_train = metric.clone(**train_args)
-        self.metrics_validation = metric.clone(**val_args)
-        self.metrics_test = metric.clone(**test_args)
+        self.metric_name = metric_name or ''
+        if self.metric_name == '' and isinstance(metric, Metric):
+            raise ValueError(f"You will need to specify 'metric_name' when a {Metric} is used.")
+        self.metrics_train = metric.clone()
+        self.metrics_validation = metric.clone()
+        self.metrics_test = metric.clone()
 
     def _select_metric_collection_from_split(self, phase: Phase) -> MetricCollection:
         if phase == Phase.TRAIN:
@@ -203,9 +200,17 @@ class BrickTorchMetric(Brick):
         selected_inputs = select_inputs_by_name(named_inputs, input_names=self.input_names)
         metric.update(*selected_inputs)
 
-    def summarize(self, phase: Phase, reset: bool):
+    def summarize(self, phase: Phase, reset: bool) -> Dict[str, Any]:
         metric = self._select_metric_collection_from_split(phase=phase)
         metrics = metric.compute()
         if reset:
             metric.reset()
+
+        metric_name_prefix = self.get_metric_name(phase=phase, metric_name=self.metric_name)
+        if isinstance(metric, MetricCollection):
+            metrics = {f'{metric_name_prefix}{metric_name}': metric for metric_name, metric in metrics.items()}
+        elif isinstance(metric, Metric):
+            metrics = {metric_name_prefix: metrics}
+        else:
+            raise NameError()
         return metrics

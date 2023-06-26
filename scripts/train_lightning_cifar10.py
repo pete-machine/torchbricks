@@ -15,7 +15,7 @@ import torchvision
 from torchvision import datasets, transforms
 from lightning_module import LightningBrickCollection
 from torchbricks.bag_of_bricks import resnet_to_brick
-from torchbricks.bag_of_bricks import ImageClassifier
+from torchbricks.bag_of_bricks import ImageClassifier, Preprocessor
 
 from torchbricks.bricks import Brick, BrickCollection, BrickLoss, BrickNotTrainable, BrickTorchMetric, BrickTrainable, Phase
 from torchbricks.custom_metrics import ConcatenatePredictionAndTarget
@@ -68,18 +68,6 @@ class CIFAR10DataModule(LightningDataModule):
         return DataLoader(self.cifar_test, batch_size=self.batch_size, num_workers=self.num_workers, shuffle=False)
 
 
-class PreprocessorCifar10(nn.Module):
-    def __init__(self) -> None:
-        super().__init__()
-        self.normalize = transforms.Normalize(
-            mean=[x / 255.0 for x in [125.3, 123.0, 113.9]],
-            std=[x / 255.0 for x in [63.0, 62.1, 66.7]],
-        )
-
-    def forward(self, x):
-        return self.normalize(x)
-
-
 def create_resnet_18(pretrained=False, num_classes=10):
     model = torchvision.models.resnet18(pretrained=pretrained, num_classes=num_classes)
     model.conv1 = nn.Conv2d(3, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
@@ -90,7 +78,7 @@ def create_resnet_18(pretrained=False, num_classes=10):
 def create_cifar_bricks(num_classes: int) -> Dict[str, Brick]:
 
     named_bricks = {
-        'preprocessor': BrickNotTrainable(PreprocessorCifar10(), input_names=['raw'], output_names=['normalized']),
+        'preprocessor': BrickNotTrainable(Preprocessor(), input_names=['raw'], output_names=['normalized']),
         'backbone': resnet_to_brick(resnet=create_resnet_18(num_classes=num_classes),
                                                      input_name='normalized',
                                                      output_name='features'),

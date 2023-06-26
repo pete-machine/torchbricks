@@ -16,7 +16,7 @@ First we specify regular pytorch modules: A preprocessor, a model and a classifi
 ```python
 import torch
 from torch import nn
-class Preprocessor(nn.Module):
+class PreprocessorDummy(nn.Module):
     def forward(self, raw_input: torch.Tensor) -> torch.Tensor:
         return raw_input/2
 
@@ -28,7 +28,7 @@ class TinyModel(nn.Module):
     def forward(self, tensor: torch.Tensor) -> torch.Tensor:
         return self.conv(tensor)
 
-class Classifier(nn.Module):
+class ClassifierDummy(nn.Module):
     def __init__(self, num_classes: int, in_features: int) -> None:
         super().__init__()
         self.fc = nn.Linear(in_features, num_classes)
@@ -46,9 +46,9 @@ from torchbricks.bricks import BrickCollection, BrickNotTrainable, BrickTrainabl
 
 # Defining model from bricks
 bricks = {
-    'preprocessor': BrickNotTrainable(Preprocessor(), input_names=['raw'], output_names=['processed']),
+    'preprocessor': BrickNotTrainable(PreprocessorDummy(), input_names=['raw'], output_names=['processed']),
     'backbone': BrickTrainable(TinyModel(n_channels=3, n_features=10), input_names=['processed'], output_names=['embedding']),
-    'image_classifier': BrickTrainable(Classifier(num_classes=3, in_features=10), input_names=['embedding'], output_names=['logits'])
+    'image_classifier': BrickTrainable(ClassifierDummy(num_classes=3, in_features=10), input_names=['embedding'], output_names=['logits'])
 }
 
 # Executing model
@@ -58,7 +58,7 @@ outputs = model(named_inputs={'raw': batch_image_example}, phase=Phase.TRAIN)
 print(outputs.keys())
 ```
 
-All modules are added as entries in a regular dictionary, and for each module we 1) specify a name - the dictionary key -
+All modules are added as entries in a regular dictionary, and for each module we 1) specify a name
 2) if it is trainable or not (`BrickTrainable`/`BrickNotTrainable`) and 3) input and output names.
 
 Finally, bricks are collected in a `BrickCollection`. A `BrickCollection` has the functionality of a
@@ -78,23 +78,55 @@ but it becomes easier to add and remove sub-collections bricks.
 ## Bag of bricks - reusable bricks modules
 We provide a bag-of-bricks with commonly used `nn.Module`s
 
-Below we create a brick collection with real models.
+Below we create a brick collection with a real world example including a `Preprocessor`, an adaptor function to convert
+torchvision resnet models into a backbone brick with no classifier and an `ImageClassifier`.
 
 
 ```python
 from torchvision.models import resnet18
 
-from torchbricks.bag_of_bricks import ImageClassifier, resnet_to_brick
+from torchbricks.bag_of_bricks import ImageClassifier, resnet_to_brick, Preprocessor
 
 num_classes = 10
 resnet_brick = resnet_to_brick(resnet=resnet18(weights=False, num_classes=num_classes),  input_name='normalized', output_name='features')
 bricks = {
-    # 'preprocessor': BrickNotTrainable(PreprocessorCifar10(), input_names=['raw'], output_names=['normalized']),
+    'preprocessor': BrickNotTrainable(Preprocessor(), input_names=['raw'], output_names=['normalized']),
     'backbone': resnet_brick,
     'image_classifier': BrickTrainable(ImageClassifier(num_classes=num_classes, n_features=resnet_brick.model.n_backbone_features),
                                      input_names=['features'], output_names=['logits', 'probabilities', 'class_prediction']),
 }
-print("MISSING: Basic preprocessing module")
+bricks
+```
+
+## Use-case: Bricks `on_step`-function for training and evaluation
+In above examples, we have showed how to compose trainable and non-trainable bricks, and how a dictionary of tensors is passed
+to the forward function... But TorchBricks goes beyond that.
+
+An important feature of a brick collection is the `on_step`-function to also calculate metrics and losses.
+
+We will extend the example from before:
+
+
+```python
+from torchbricks.bricks import BrickLoss, BrickTorchMetric
+from torchmetrics.classification import MulticlassAccuracy
+
+
+bricks["accuracy"] = BrickTorchMetric(MulticlassAccuracy(num_classes=num_classes), input_names=['class_prediction', 'targets'])
+bricks["loss"] = BrickLoss(model=nn.CrossEntropyLoss(), input_names=['logits', 'targets'], output_names=['loss_ce'])
+
+
+# We can still run the forward-pass as before - Note: The forward call does not require 'targets'
+model = BrickCollection(bricks)
+batch_image_example = torch.rand((1, 3, 100, 200))
+outputs = model(named_inputs={"raw": batch_image_example}, phase=Phase.TRAIN)
+
+# Example of running `on_step`. Note: `on_step` requires `targets` to calculate metrics and loss.
+named_inputs = {"raw": batch_image_example, "targets": torch.ones((1), dtype=torch.int64)}
+named_outputs, losses = model.on_step(phase=Phase.TRAIN, named_inputs=named_inputs, batch_idx=0)
+named_outputs, losses = model.on_step(phase=Phase.TRAIN, named_inputs=named_inputs, batch_idx=1)
+named_outputs, losses = model.on_step(phase=Phase.TRAIN, named_inputs=named_inputs, batch_idx=2)
+metrics = model.summarize(phase=Phase.TRAIN, reset=True)
 ```
 
 ## Basic use-case: Semantic Segmentation
@@ -103,63 +135,23 @@ This is how it would look like:
 
 
 ```python
-
-# We can optionally keep/remove image_classification from before
-bricks.pop("image_classifier")
-
-# Add upscaling and semantic segmentation nn.Modules
-
 missing_implementation = True
 if missing_implementation:
     print("MISSING")
 else:
+    # We can optionally keep/remove image_classification from before
+    bricks.pop("image_classifier")
+
+    # Add upscaling and semantic segmentation nn.Modules
     bricks["upscaling"] = BrickTrainable(Upscaling(), input_names=["embedding"], output_names=["embedding_upscaled"])
     bricks["semantic_segmentation"] = BrickTrainable(SegmentationClassifier(), input_names=["embedding_upscaled"], output_names=["ss_logits"])
 
-# Executing model
-model = BrickCollection(bricks)
-batch_image_example = torch.rand((1, 3, 100, 200))
-outputs = model(named_inputs={"raw": batch_image_example}, phase=Phase.TRAIN)
+    # Executing model
+    model = BrickCollection(bricks)
+    batch_image_example = torch.rand((1, 3, 100, 200))
+    outputs = model(named_inputs={"raw": batch_image_example}, phase=Phase.TRAIN)
 
-print(outputs.keys())
-```
-
-## Use-case: Bricks `on_step`-function for training and evaluation
-In above examples, we have showed how to compose trainable and non-trainable bricks, and how a dictionary of tensors is passed
-to the forward function... But TorchBricks goes beyond that.
-
-Another important feature of a brick collection is the `on_step`-function to also calculate metrics and losses.
-
-We will extend the example from before:
-
-
-```python
-from torchbricks.bricks import BrickCollection, BrickNotTrainable, BrickTrainable, Phase
-
-# Defining model
-bricks = {
-    "preprocessor": BrickNotTrainable(Preprocessor(), input_names=["raw"], output_names=["processed"]),
-    "backbone": BrickTrainable(ResNetBackbone(), input_names=["processed"], output_names=["embedding"]),
-    "image_classification": BrickTrainable(ImageClassifier(), input_names=["embedding"], output_names=["logits"])
-}
-
-accuracy_metric = classification.MulticlassAccuracy(num_classes=num_classes, average='micro', multiclass=True)
-bricks["accuracy"] = BrickTorchMetric(accuracy_metric, input_names=['class_prediction', 'targets'])
-bricks["loss"] = BrickLoss(model=nn.CrossEntropyLoss(), input_names=['logits', 'targets'], output_names=['loss_ce'])
-
-
-# We can still run the forward-pass as before - Note: The forward call does not require 'targets'
-model = BrickCollection(bricks)
-outputs = model(named_inputs={"raw": input_images}, phase=Phase.TRAIN)
-print(outputs.keys())
-"raw", "processed", "embedding", "logits"
-
-# Example of running `on_step`. Note: `on_step` requires `targets` to calculate metrics and loss.
-named_inputs = {"raw": input_images, "targets": targets}
-named_outputs, losses = model.on_step(phase=Phase.TRAIN, named_inputs=named_inputs, batch_idx=0)
-named_outputs, losses = model.on_step(phase=Phase.TRAIN, named_inputs=named_inputs, batch_idx=1)
-named_outputs, losses = model.on_step(phase=Phase.TRAIN, named_inputs=named_inputs, batch_idx=2)
-metrics = model.summarize(phase=Phase.TRAIN, reset=True)
+    print(outputs.keys())
 ```
 
 By wrapping both core model computations, metrics and loss functions into a single brick collection, we can more easily swap between

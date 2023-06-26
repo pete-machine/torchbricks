@@ -1,11 +1,12 @@
+import pytest
 from torchbricks import bricks
-from torchbricks.bricks import Phase
+from torchbricks.bricks import BrickCollection, BrickLoss, BrickTorchMetric, Phase
 from torchbricks import custom_metrics
 from typing import Dict
 import torch
 from torch import nn
 import torchmetrics
-from torchmetrics import classification
+from torchmetrics.classification import MulticlassAccuracy
 
 def create_brick_collection(num_classes: int, num_backbone_featues: int) -> Dict[str, bricks.Brick]:
     class Preprocessor(nn.Module):
@@ -33,8 +34,8 @@ def create_brick_collection(num_classes: int, num_backbone_featues: int) -> Dict
 
 
     metric_collection = torchmetrics.MetricCollection({
-        'MeanAccuracy': classification.MulticlassAccuracy(num_classes=num_classes, average='macro', multiclass=True),
-        'Accuracy': classification.MulticlassAccuracy(num_classes=num_classes, average='micro', multiclass=True),
+        'MeanAccuracy': MulticlassAccuracy(num_classes=num_classes, average='macro'),
+        'Accuracy': MulticlassAccuracy(num_classes=num_classes, average='micro'),
         'ConfMat': torchmetrics.ConfusionMatrix(task='multiclass', num_classes=num_classes),
         'Concatenate': custom_metrics.ConcatenatePredictionAndTarget(compute_on_cpu=True)
     })
@@ -189,3 +190,55 @@ def assert_equal_dictionaries(d0, d1):
             assert torch.equal(values, d1[key])
         else:
             assert values == d1[key]
+
+def test_brick_torch_metric_single_metric():
+    num_classes = 5
+    metric_name = 'Accuracy'
+    bricks = {
+        'accuracy': BrickTorchMetric(MulticlassAccuracy(num_classes=num_classes),
+                                     input_names=['logits', 'targets'],
+                                     metric_name=metric_name),
+        'loss': BrickLoss(model=nn.CrossEntropyLoss(), input_names=['logits', 'targets'], output_names=['loss_ce'])
+    }
+
+    model = BrickCollection(bricks)
+    batch_logits = torch.rand((1, num_classes))
+    phase = Phase.TRAIN
+    named_inputs = {'logits': batch_logits, 'targets': torch.ones((1), dtype=torch.int64)}
+    model.on_step(phase=phase, named_inputs=named_inputs, batch_idx=0)
+    metrics = model.summarize(phase=phase, reset=True)
+
+    assert list(metrics) == [f'{phase.value}/{metric_name}']
+
+
+def test_brick_torch_metric_single_metric_assert():
+    metric_name = None
+    with pytest.raises(ValueError, match="You will need to specify 'metric_name'"):
+        BrickTorchMetric(MulticlassAccuracy(num_classes=10), input_names=['logits', 'targets'], metric_name=metric_name)
+
+
+
+def test_brick_torch_metric_multiple_metric():
+    num_classes = 5
+    metric_collection = torchmetrics.MetricCollection({
+        'MeanAccuracy': MulticlassAccuracy(num_classes=num_classes, average='macro'),
+        'Accuracy': MulticlassAccuracy(num_classes=num_classes, average='micro'),
+        'ConfMat': torchmetrics.ConfusionMatrix(task='multiclass', num_classes=num_classes),
+        'Concatenate': custom_metrics.ConcatenatePredictionAndTarget(compute_on_cpu=True)
+    })
+
+    metric_name = None # None is allowed for metric collection.
+    bricks = {
+        'metrics': BrickTorchMetric(metric_collection, input_names=['logits', 'targets'], metric_name=metric_name),
+        'loss': BrickLoss(model=nn.CrossEntropyLoss(), input_names=['logits', 'targets'], output_names=['loss_ce'])
+    }
+
+    model = BrickCollection(bricks)
+    batch_logits = torch.rand((1, num_classes))
+    phase = Phase.TRAIN
+    named_inputs = {'logits': batch_logits, 'targets': torch.ones((1), dtype=torch.int64)}
+    model.on_step(phase=phase, named_inputs=named_inputs, batch_idx=0)
+    metrics = model.summarize(phase=phase, reset=True)
+
+    expected_metrics = {f'{phase.value}/{name}' for name in metric_collection}
+    assert set(metrics) == expected_metrics

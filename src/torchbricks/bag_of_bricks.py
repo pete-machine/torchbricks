@@ -2,7 +2,7 @@ import torch
 from torch import nn, Tensor
 import torch.nn.functional as F
 from torchvision.models import ResNet
-
+from torchvision import transforms
 from torchbricks.bricks import BrickTrainable
 
 def resnet_to_brick(resnet: ResNet, input_name: str, output_name: str):
@@ -76,3 +76,15 @@ class ImageClassifier(nn.Module):
         probabilities = self.softmax(logits)
         class_prediction = torch.argmax(probabilities, dim=1)
         return logits, probabilities, class_prediction
+
+
+class Preprocessor:
+    def __init__(
+        self,
+        mean=(0.485, 0.456, 0.406),
+        std=(0.229, 0.224, 0.225),
+    ):
+        self.transforms = transforms.Normalize(mean=mean, std=std)
+
+    def __call__(self, img):
+        return self.transforms(img)
