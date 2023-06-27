@@ -3,70 +3,21 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict
 from pytorch_lightning.loggers import WandbLogger
-from pytorch_lightning import LightningDataModule, Trainer
+from pytorch_lightning import Trainer
 import torch
 from torch import nn
 from torch.optim.lr_scheduler import OneCycleLR
-from torch.utils.data import DataLoader, random_split
 import torchmetrics
 from torchmetrics import classification
 import torchvision
 
-from torchvision import datasets, transforms
-from lightning_module import LightningBrickCollection
+from utils_testing.datamodule_cifar10 import CIFAR10DataModule
+from utils_testing.lightning_module import LightningBrickCollection
 from torchbricks.bag_of_bricks import resnet_to_brick
 from torchbricks.bag_of_bricks import ImageClassifier, Preprocessor
 
 from torchbricks.bricks import Brick, BrickCollection, BrickLoss, BrickNotTrainable, BrickTorchMetric, BrickTrainable, Phase
 from torchbricks.custom_metrics import ConcatenatePredictionAndTarget
-
-
-class CIFAR10DataModule(LightningDataModule):
-    def __init__(self, data_dir: str,
-                 batch_size: int,
-                 num_workers: int,
-                 train_transforms: transforms.Compose,
-                 test_transforms: transforms.Compose,
-                 # val_transforms: transforms.Compose,
-                 ):
-        super().__init__()
-        self.data_dir = data_dir
-        self.train_transforms = train_transforms
-        self.test_transforms = test_transforms
-        # self.val_transforms = val_transforms
-        self.batch_size = batch_size
-        self.num_workers = num_workers
-        self.dims = (3, 32, 32)
-        self.num_classes = 10
-        self.label_names = list(str(number) for number in range(self.num_classes))
-
-    def get_data_class_info(self):
-        return {'dims': self.dims, 'num_classes': self.num_classes, 'label_names': self.label_names}
-
-    def prepare_data(self):
-        # download
-        datasets.CIFAR10(self.data_dir, train=True, download=True)
-        datasets.CIFAR10(self.data_dir, train=False, download=True)
-
-    def setup(self, stage=None):
-        # Assign train/val datasets for use in dataloaders
-        if stage == 'fit' or stage is None:
-            cifar_full = datasets.CIFAR10(self.data_dir, train=True, transform=self.train_transforms)
-            self.cifar_train, self.cifar_val = random_split(cifar_full, [45000, 5000])
-
-        # Assign test dataset for use in dataloader(s)
-        if stage == 'test' or stage is None:
-            self.cifar_test = datasets.CIFAR10(self.data_dir, train=False, transform=self.test_transforms)
-
-    def train_dataloader(self) -> DataLoader:
-        return DataLoader(self.cifar_train, batch_size=self.batch_size, num_workers=self.num_workers, shuffle=True)
-
-    def val_dataloader(self) -> DataLoader:
-        return DataLoader(self.cifar_val, batch_size=self.batch_size, num_workers=self.num_workers, shuffle=False)
-
-    def test_dataloader(self) -> DataLoader:
-        return DataLoader(self.cifar_test, batch_size=self.batch_size, num_workers=self.num_workers, shuffle=False)
-
 
 def create_resnet_18(pretrained=False, num_classes=10):
     model = torchvision.models.resnet18(pretrained=pretrained, num_classes=num_classes)
@@ -98,8 +49,6 @@ def create_cifar_bricks(num_classes: int) -> Dict[str, Brick]:
         'loss_ce': BrickLoss(model=nn.CrossEntropyLoss(), input_names=['logits', 'targets'], output_names=['loss_ce']),
         'metrics_classification': BrickTorchMetric(metric=metrics, input_names=['class_prediction', 'targets'],  metric_name=''),
         }
-
-
     return named_bricks
 
 

@@ -1,5 +1,6 @@
+from datetime import datetime
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Optional
 from pytorch_lightning import LightningModule
 import torch
 
@@ -9,11 +10,13 @@ from torchbricks.bricks import BrickCollection, Phase
 
 class LightningBrickCollection(LightningModule):
     def __init__(self, path_experiments: Path,
-                 experiment_name: str,
+                 experiment_name: Optional[str],
                  brick_collection: BrickCollection,
                  create_optimizers_func: Callable):
         super().__init__()
 
+        if experiment_name is None:
+            experiment_name = datetime.now().strftime('%Y_%m_%d_T_%H_%M_%S')
         self.path_experiment = path_experiments / experiment_name
         self.path_experiment.mkdir()
 
