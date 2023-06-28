@@ -47,8 +47,8 @@ train-cifar10:           ## Run CIFAR10 training
 	@set -e
 	$(PYTHONPATH) python scripts/train_lightning_cifar10.py --batch_size 256 --num_workers 10 --max_epochs 20 --accelerator gpu
 
-.PHONY: readme-create
-readme-create:        ## Update lock file using the specification in 'environment.yml'
+.PHONY: readme-update
+readme-iådate:        ## Convert README.ipynb to README.md
 	@jupyter nbconvert --clear-output --to notebook --output=build/tmp_readme.ipynb README.ipynb
 	@jupyter nbconvert --to markdown --output=../README.md build/tmp_readme.ipynb
 # PYTHONPATH=src jupyter nbconvert --execute --to markdown README.ipynb

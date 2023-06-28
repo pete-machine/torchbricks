@@ -7,6 +7,15 @@ TorchBricks builds pytorch models using small reuseable and decoupled parts - we
 
 The concept is simple and flexible and allows you to more easily combine and swap out parts of the model (preprocessor, backbone, neck, head or post-processor), change the task or extend it with multiple tasks.
 
+
+
+## Install it with pip
+
+```bash
+pip install torchbricks
+```
+
+
 ## Basic use-case: Image classification
 Let us see it in action:
 
@@ -65,12 +74,12 @@ All modules are added as entries in a regular dictionary, and for each module we
 
 Finally, bricks are collected in a `BrickCollection`. A `BrickCollection` is a
 regular `nn.Module` with a `forward`-function, `to` to move to a specific device/precision,
-save/loading and management of parameters etc.
+you can save/load a model, management of parameters, export model as either onnx/TorchScript etc.
 
 Furthermore a brick collection acts as a simple DAG, it accepts a dictionary (`named_inputs`),
 executes each bricks and ensures that the outputs are passed to the inputs of other bricks with matching names.
 Structuring the model as a DAG, makes it easy to add/remove outputs for a given module, add new modules to a given model
-and build completely new models.
+and build completely new models from reusable parts.
 
 Note also that we set `phase=Phase.TRAIN` to explicitly specify if we are doing training, validation, test or inference.
 Specifying a phase is important, if we want a module to act in a specific way during specific phases.
@@ -178,25 +187,21 @@ from functools import partial
 from pathlib import Path
 
 import torchvision
-from pytorch_lightning import Trainer
-from pytorch_lightning.loggers import WandbLogger
+import pytorch_lightning as pl
 from utils_testing.lightning_module import LightningBrickCollection
 from utils_testing.datamodule_cifar10 import CIFAR10DataModule
-from utils_testing.utils_testing import path_repo_root
+
 experiment_name="CIFAR10"
-print(path_repo_root())
-# transform = torchvision.transforms.Compose([])
 transform = torchvision.transforms.ToTensor()
-data_module = CIFAR10DataModule(data_dir=path_repo_root() / 'data', batch_size=5, num_workers=0, test_transforms=transform, train_transforms=transform)
+data_module = CIFAR10DataModule(data_dir='data', batch_size=5, num_workers=12, test_transforms=transform, train_transforms=transform)
 create_opimtizer_func = partial(torch.optim.SGD, lr=0.05, momentum=0.9, weight_decay=5e-4)
-bricks_lightning_module = LightningBrickCollection(path_experiments=path_repo_root() / "build" / "experiments",
+bricks_lightning_module = LightningBrickCollection(path_experiments=Path("build") / "experiments",
                                                    experiment_name=None,
                                                    brick_collection=brick_collection,
                                                    create_optimizers_func=create_opimtizer_func)
 
-logger = WandbLogger(name=experiment_name, project="test_project")
-trainer = Trainer(accelerator="cpu", logger=logger, max_epochs=1, limit_train_batches=2, limit_val_batches=2, limit_test_batches=2)
-# To fit and train
+trainer = pl.Trainer(accelerator="cpu", max_epochs=1, limit_train_batches=2, limit_val_batches=2, limit_test_batches=2)
+# To train and test model
 trainer.fit(bricks_lightning_module, datamodule=data_module)
 trainer.test(bricks_lightning_module, datamodule=data_module)
 ```
@@ -237,13 +242,23 @@ It can handle nested brick collections and nested dictionary of bricks.
 
 MISSING
 
+
+
+
 ## TorchMetric.MetricCollection
 
 MISSING
 
+
+
+
+
 ## Why should I explicitly set the train, val or test phase
 
 MISSING
+
+
+
 
 ##
 
@@ -271,11 +286,7 @@ MISSING
 ## How does it really work?
 ????
 
-## Install it from PyPI
 
-```bash
-pip install torchbricks
-```
 
 ## Development
 
