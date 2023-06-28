@@ -42,3 +42,8 @@ push            = false
 [tool.bumpver.file_patterns]  # Specify all files containging version-numbers
 "pyproject.toml" = ['current_version = "{version}"', 'version = "{version}"']
 "src/torchbricks/__init__.py" = ["{version}"]
+
+[tool.pytest.ini_options]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]

@@ -18,7 +18,7 @@ class Phase(Enum):              # Gradients/backward  Eval-model    Targets
 class Brick(nn.Module, ABC):
 
     @abstractmethod
-    def forward(self, phase: Phase, named_inputs: Dict[str, Any]) -> Dict[str, Any]:
+    def forward(self, named_inputs: Dict[str, Any], phase: Phase) -> Dict[str, Any]:
         """"""
         raise ValueError(f"If you are not using 'forward' then set it to 'forward=None' in class {self}")
 
@@ -28,7 +28,7 @@ class Brick(nn.Module, ABC):
         raise ValueError(f"If you are not using 'calculate_loss' then set it to 'calculate_loss=None' in class {self}")
 
     @abstractmethod
-    def update_metrics(self, phase: Phase, named_inputs: Dict[str, Any], batch_idx: int) -> None:
+    def update_metrics(self, named_inputs: Dict[str, Any], phase: Phase, batch_idx: int) -> None:
         """"""
         raise ValueError(f"If you are not using 'update_metrics' then set it to 'update_metrics=None' in class {self}")
 
@@ -37,7 +37,7 @@ class Brick(nn.Module, ABC):
         """"""
         raise ValueError(f"If you are not using 'summarize' then set it to 'summarize=None' in class {self}")
 
-    def on_step(self, phase: Phase, named_inputs: Dict[str, Any], batch_idx: int) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    def on_step(self, named_inputs: Dict[str, Any], phase: Phase, batch_idx: int) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         named_inputs = self.forward(phase=phase, named_inputs=named_inputs)
         losses = self.calculate_loss(named_inputs=named_inputs)
         named_inputs.update(losses)
@@ -65,7 +65,7 @@ class BrickCollection(nn.ModuleDict, Brick):  # Note BrickCollection is inherent
     def __init__(self, bricks: Dict[str, Brick]) -> None:
         super().__init__(convert_nested_dict_to_nested_brick_collection(bricks))
 
-    def forward(self, phase: Phase, named_inputs: Dict[str, Any]) -> Dict[str, Any]:
+    def forward(self, named_inputs: Dict[str, Any], phase: Phase) -> Dict[str, Any]:
         named_inputs = dict(named_inputs)  # To keep `named_inputs` unchanged
         forward_bricks = [brick for brick in self.values() if brick.forward is not None]
         for brick in forward_bricks:
@@ -83,7 +83,7 @@ class BrickCollection(nn.ModuleDict, Brick):  # Note BrickCollection is inherent
                 losses.update(brick.calculate_loss(named_inputs=named_inputs))
         return losses
 
-    def update_metrics(self, phase: Phase, named_inputs: Dict[str, Any], batch_idx: int) -> None:
+    def update_metrics(self, named_inputs: Dict[str, Any], phase: Phase, batch_idx: int) -> None:
         update_metrics_bricks = [brick for brick in self.values() if brick.update_metrics is not None]
         for brick in update_metrics_bricks:
             brick.update_metrics(phase=phase, named_inputs=named_inputs, batch_idx=batch_idx)
@@ -109,7 +109,7 @@ class BrickTrainable(Brick):
         self.output_names = output_names
         self.model = model
 
-    def forward(self, phase: Phase, named_inputs: Dict[str, Any]) -> Dict[str, Any]:
+    def forward(self, named_inputs: Dict[str, Any], phase: Phase) -> Dict[str, Any]:
         named_inputs['phase'] = phase
         return named_input_and_outputs_callable(callable=self.model,
                                                 named_inputs=named_inputs,
@@ -133,7 +133,7 @@ class BrickNotTrainable(Brick):
             self.model.requires_grad_(False)
 
     @torch.no_grad()
-    def forward(self, phase: Phase, named_inputs: Dict[str, Any]) -> Dict[str, Any]:
+    def forward(self, named_inputs: Dict[str, Any], phase: Phase) -> Dict[str, Any]:
         named_inputs['phase'] = phase
         return named_input_and_outputs_callable(callable=self.model,
                                                 named_inputs=named_inputs,
@@ -192,8 +192,8 @@ class BrickTorchMetric(Brick):
         return f'{phase.value}/{metric_name}'
 
     def update_metrics(self,
-                       phase: Phase,
                        named_inputs: Union[List[str], Dict[str, str]],
+                       phase: Phase,
                        batch_idx: int) -> None:
         metric = self._select_metric_collection_from_split(phase=phase)
         named_inputs['phase'] = phase

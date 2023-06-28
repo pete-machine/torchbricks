@@ -134,3 +134,4 @@ dmypy.json
 data/
 runs/
 wandb/
+lightning_logs/

@@ -1,3 +1,4 @@
+from pathlib import Path
 import pytest
 from torchbricks import bricks
 from torchbricks.bricks import BrickCollection, BrickLoss, BrickTorchMetric, Phase
@@ -7,6 +8,8 @@ import torch
 from torch import nn
 import torchmetrics
 from torchmetrics.classification import MulticlassAccuracy
+
+from utils_testing.utils_testing import assert_equal_dictionaries
 
 def create_brick_collection(num_classes: int, num_backbone_featues: int) -> Dict[str, bricks.Brick]:
     class Preprocessor(nn.Module):
@@ -183,14 +186,6 @@ def test_nested_bricks():
     assert_equal_dictionaries(outputs1, outputs2)
 
 
-def assert_equal_dictionaries(d0, d1):
-    assert set(d0) == set(d1)
-    for key, values in d0.items():
-        if isinstance(values, torch.Tensor):
-            assert torch.equal(values, d1[key])
-        else:
-            assert values == d1[key]
-
 def test_brick_torch_metric_single_metric():
     num_classes = 5
     metric_name = 'Accuracy'
@@ -242,3 +237,70 @@ def test_brick_torch_metric_multiple_metric():
 
     expected_metrics = {f'{phase.value}/{name}' for name in metric_collection}
     assert set(metrics) == expected_metrics
+
+def test_save_and_load_of_brick_collection(tmp_path: Path):
+    brick_collection = create_brick_collection(num_classes=3, num_backbone_featues=10)
+    model = BrickCollection(brick_collection)
+    path_model = tmp_path / 'test_model.pt'
+
+    # Trainable parameters are saved
+    torch.save(model.state_dict(), path_model)
+
+    # Trainable parameters are loaded
+    model.load_state_dict(torch.load(path_model))
+
+def iterate_phases():
+    num_classes = 3
+    brick_collection = create_brick_collection(num_classes=num_classes, num_backbone_featues=10)
+    model = BrickCollection(brick_collection)
+
+    named_inputs = {'labels': torch.tensor(range(num_classes), dtype=torch.float64), 'raw': torch.zeros((3, 24, 24))}
+    for phase in Phase:
+        model(named_inputs=named_inputs, phase=phase)
+        model.on_step(named_inputs=named_inputs, phase=phase, batch_idx=0)
+        model.summarize(phase, reset=True)
+
+
+@pytest.mark.slow
+def test_compile():
+    num_classes = 3
+    brick_collection = create_brick_collection(num_classes=num_classes, num_backbone_featues=10)
+    model = BrickCollection(brick_collection)
+
+    named_inputs = {'labels': torch.tensor(range(num_classes), dtype=torch.float64), 'raw': torch.zeros((3, 24, 24))}
+    forward_expected = model(named_inputs=named_inputs, phase=Phase.TRAIN)
+    on_step_expected = model.on_step(named_inputs=named_inputs, phase=Phase.TRAIN, batch_idx=0)
+
+    model_compiled = torch.compile(model)
+    forward_actual = model_compiled(named_inputs=named_inputs, phase=Phase.TRAIN)
+    on_step_actual = model_compiled.on_step(named_inputs=named_inputs, phase=Phase.TRAIN, batch_idx=0)
+
+    assert_equal_dictionaries(forward_expected, forward_actual, is_close=True)
+    assert_equal_dictionaries(on_step_expected[0], on_step_actual[0], is_close=True)
+    assert_equal_dictionaries(on_step_expected[1], on_step_actual[1], is_close=True)
+
+# def test_export_onnx_trace():
+#     num_classes = 3
+#     brick_collection = create_brick_collection(num_classes=num_classes, num_backbone_featues=10)
+#     model = BrickCollection(brick_collection)
+#     # named_inputs = {"named_inputs": {'raw': torch.zeros((3, 24, 24))}, "phase": Phase.INFERENCE}
+#     named_inputs = {'raw': torch.zeros((3, 24, 24))}
+#     # model_scripted = torch.jit.script(model)  # Export to TorchScript
+#     # model_scripted.save('model_scripted.pt')  # Save
+
+#     kwargs = {"named_inputs": named_inputs, "phase": Phase.INFERENCE}
+#     outputs = model(**kwargs)
+
+#     class OnnxExportable(nn.Module):
+#         def __init__(self, model: nn.Module, phase: Phase) -> None:
+#             super().__init__()
+#             self.model = model
+#             self.phase = phase
+
+#         def forward(self, named_inputs):
+#             return self.model.forward(named_inputs=named_inputs, phase=self.phase)
+#     onnx_exportable = OnnxExportable(model=model, phase=Phase.INFERENCE)
+#     torch.onnx.export(model=onnx_exportable, args=tuple(named_inputs.values()),
+#                       f="model.onnx", verbose=True,
+#                       input_names=list(named_inputs),
+#                       output_names=list(outputs))

@@ -18,7 +18,7 @@ class LightningBrickCollection(LightningModule):
         if experiment_name is None:
             experiment_name = datetime.now().strftime('%Y_%m_%d_T_%H_%M_%S')
         self.path_experiment = path_experiments / experiment_name
-        self.path_experiment.mkdir()
+        self.path_experiment.mkdir(parents=True)
 
         self.bricks = brick_collection
         self.create_optimizers_func = create_optimizers_func
