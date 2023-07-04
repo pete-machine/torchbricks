@@ -32,8 +32,9 @@ class LightningBrickCollection(LightningModule):
         self.log_dict(single_valued_metrics)
 
     def _step(self, phase: Phase, batch, batch_idx: int):
-        named_inputs = {'raw': batch[0], 'targets': batch[1]}
-        _, losses = self.bricks.on_step(phase=phase, named_inputs=named_inputs, batch_idx=batch_idx)
+        named_inputs = {'raw': batch[0], 'targets': batch[1], 'batch_idx': batch_idx}
+        named_outputs = self.bricks(phase=phase, named_inputs=named_inputs)
+        losses = self.bricks.extract_losses(named_outputs=named_outputs)
         loss = 0
         for loss_name, loss_value in losses.items():
             self.log(f'{phase.value}/{loss_name}', loss_value)

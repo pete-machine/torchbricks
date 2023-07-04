@@ -1,53 +1,130 @@
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Dict, Any, List, Optional, Tuple, Union
-import torch
+from typing import Dict, Any, List, Optional, Union
 from torch import nn
 from torchmetrics import MetricCollection, Metric
 
-from torchbricks.bricks_helper import named_input_and_outputs_callable, select_inputs_by_name
+from torchbricks.bricks_helper import named_input_and_outputs_callable
 
 
-class Phase(Enum):              # Gradients/backward  Eval-model    Targets
+class Phase(Enum):              # Gradients   Eval-model    Targets
     TRAIN = 'train'             # Y                   Y             Y
     VALIDATION = 'validation'   # N                   N             Y
     TEST = 'test'               # N                   N             Y
     INFERENCE = 'inference'     # N                   N             N
+    EXPORT = 'export'           # N                   N             N
 
 
-class Brick(nn.Module, ABC):
+
+class BrickInterface(ABC):
 
     @abstractmethod
     def forward(self, named_inputs: Dict[str, Any], phase: Phase) -> Dict[str, Any]:
         """"""
-        raise ValueError(f"If you are not using 'forward' then set it to 'forward=None' in class {self}")
 
     @abstractmethod
-    def calculate_loss(self, named_inputs: Dict[str, Any]) -> Dict[str, Any]:
+    def extract_losses(self, named_outputs: Dict[str, Any]) -> Dict[str, Any]:
         """"""
-        raise ValueError(f"If you are not using 'calculate_loss' then set it to 'calculate_loss=None' in class {self}")
-
-    @abstractmethod
-    def update_metrics(self, named_inputs: Dict[str, Any], phase: Phase, batch_idx: int) -> None:
-        """"""
-        raise ValueError(f"If you are not using 'update_metrics' then set it to 'update_metrics=None' in class {self}")
 
     @abstractmethod
     def summarize(self, phase: Phase, reset: bool) -> Dict[str, Any]:
         """"""
-        raise ValueError(f"If you are not using 'summarize' then set it to 'summarize=None' in class {self}")
-
-    def on_step(self, named_inputs: Dict[str, Any], phase: Phase, batch_idx: int) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-        named_inputs = self.forward(phase=phase, named_inputs=named_inputs)
-        losses = self.calculate_loss(named_inputs=named_inputs)
-        named_inputs.update(losses)
-
-        with torch.no_grad():
-            self.update_metrics(phase=phase, named_inputs=named_inputs, batch_idx=batch_idx)
-        return named_inputs, losses
 
 
-def convert_nested_dict_to_nested_brick_collection(bricks: Dict[str, Union[Brick, Dict]], level=0):
+def parse_argument_loss_output_names(loss_output_names: Union[List[str], str], available_output_names: List[str]) -> List[str]:
+    if loss_output_names == 'all':
+        loss_output_names = available_output_names
+    elif loss_output_names == 'none':
+        loss_output_names = []
+
+    assert isinstance(loss_output_names, List), f'`loss_output_names` should be `all`, `none` or a list of strings. {loss_output_names=}'
+    assert set(loss_output_names).issubset(available_output_names), (f'One or more {loss_output_names=} is not an ',
+                                                                      '`output_names` of brick {output_names=}')
+    return loss_output_names
+
+
+def parse_argument_run_on(run_on: Union[List[Phase], str]) -> List[Phase]:
+    available_phases = list(Phase)
+    if run_on == 'all':
+        run_on = available_phases
+    elif run_on == 'none':
+        run_on = []
+
+    assert isinstance(run_on, List), f'"run_on" should be "all", "none" or List[Phases]. It is {run_on=}'
+    return run_on
+
+
+class Brick(nn.Module, BrickInterface):
+    def __init__(self, model: nn.Module,
+                 input_names: Union[List[str], Dict[str, str], str],
+                 output_names: List[str],
+                 run_on: Union[List[Phase], str] = 'all',
+                 loss_output_names: Union[List[str], str] = 'none',
+                 calculate_gradients: bool = True,
+                 trainable: Optional[bool] = None) -> None:
+        super().__init__()
+        self.model = model
+        self.input_names = input_names
+        self.output_names = output_names
+
+        self.loss_output_names = parse_argument_loss_output_names(loss_output_names, available_output_names=output_names)
+        self.run_on = parse_argument_run_on(run_on)
+
+        if calculate_gradients:
+            self.calculate_gradients_on = [Phase.TRAIN]
+        else:
+            self.calculate_gradients_on = []
+
+        trainable = trainable or True
+        if not trainable and hasattr(model, 'requires_grad_'):
+            self.model.requires_grad_(False)
+
+    def forward(self, named_inputs: Dict[str, Any], phase: Phase) -> Dict[str, Any]:
+        skip_forward = phase not in self.run_on
+        if skip_forward:
+            return {}
+
+        calculate_gradients = phase in self.calculate_gradients_on
+        named_inputs['phase'] = phase
+        named_outputs = named_input_and_outputs_callable(callable=self.model, named_inputs=named_inputs, input_names=self.input_names,
+                                                         output_names=self.output_names, calculate_gradients=calculate_gradients)
+
+        return named_outputs
+
+    def extract_losses(self, named_outputs: Dict[str, Any]) -> Dict[str, Any]:
+        named_losses = {name: loss for name, loss in named_outputs.items() if name in self.loss_output_names}
+        return named_losses
+
+    def summarize(self, phase: Phase, reset: bool) -> Dict[str, Any]:
+        return {}
+
+
+
+class BrickCollection(nn.ModuleDict, BrickInterface):  # Note BrickCollection is inherently ModuleDict and acts as a dictionary of modules
+    def __init__(self, bricks: Dict[str, BrickInterface]) -> None:
+        super().__init__(convert_nested_dict_to_nested_brick_collection(bricks))
+
+    def forward(self, named_inputs: Dict[str, Any], phase: Phase) -> Dict[str, Any]:
+        named_inputs = dict(named_inputs)  # To keep the argument `named_inputs` unchanged
+        for brick in self.values():
+            results = brick.forward(phase=phase, named_inputs=named_inputs)
+            named_inputs.update(results)
+        return named_inputs
+
+    def extract_losses(self, named_outputs: Dict[str, Any]) -> Dict[str, Any]:
+        named_losses = {}
+        for brick in self.values():
+            named_losses.update(brick.extract_losses(named_outputs=named_outputs))
+        return named_losses
+
+    def summarize(self, phase: Phase, reset: bool) -> Dict[str, Any]:
+        metrics = {}
+        for brick in self.values():
+            metrics.update(brick.summarize(phase=phase, reset=reset))
+        return metrics
+
+
+def convert_nested_dict_to_nested_brick_collection(bricks: Dict[str, Union[BrickInterface, Dict]], level=0):
     converted_bricks = {}
     for name, brick in bricks.items():
         if isinstance(brick, dict):
@@ -61,119 +138,70 @@ def convert_nested_dict_to_nested_brick_collection(bricks: Dict[str, Union[Brick
         return BrickCollection(converted_bricks)
 
 
-class BrickCollection(nn.ModuleDict, Brick):  # Note BrickCollection is inherently ModuleDict and acts as a dictionary of modules
-    def __init__(self, bricks: Dict[str, Brick]) -> None:
-        super().__init__(convert_nested_dict_to_nested_brick_collection(bricks))
-
-    def forward(self, named_inputs: Dict[str, Any], phase: Phase) -> Dict[str, Any]:
-        named_inputs = dict(named_inputs)  # To keep `named_inputs` unchanged
-        forward_bricks = [brick for brick in self.values() if brick.forward is not None]
-        for brick in forward_bricks:
-            results = brick.forward(phase=phase, named_inputs=named_inputs)
-            if results is None:
-                results = {}
-            named_inputs.update(results)
-        return named_inputs
-
-    def calculate_loss(self, named_inputs: Dict[str, Any]) -> Dict[str, Any]:
-        loss_bricks = [brick for brick in self.values() if brick.calculate_loss is not None]
-        losses = {}
-        for brick in loss_bricks:
-            if brick.calculate_loss is not None:
-                losses.update(brick.calculate_loss(named_inputs=named_inputs))
-        return losses
-
-    def update_metrics(self, named_inputs: Dict[str, Any], phase: Phase, batch_idx: int) -> None:
-        update_metrics_bricks = [brick for brick in self.values() if brick.update_metrics is not None]
-        for brick in update_metrics_bricks:
-            brick.update_metrics(phase=phase, named_inputs=named_inputs, batch_idx=batch_idx)
-
-    def summarize(self, phase: Phase, reset: bool) -> Dict[str, Any]:
-        update_metrics_bricks = [brick for brick in self.values() if brick.summarize is not None]
-        metrics = {}
-        for brick in update_metrics_bricks:
-            metrics.update(brick.summarize(phase=phase, reset=reset))
-        return metrics
-
-
 class BrickTrainable(Brick):
-    calculate_loss = None
-    update_metrics = None
-    summarize = None
-
     def __init__(self, model: nn.Module,
                  input_names: Union[List[str], Dict[str, str]],
-                 output_names: List[str]):
-        super().__init__()
-        self.input_names = input_names
-        self.output_names = output_names
-        self.model = model
-
-    def forward(self, named_inputs: Dict[str, Any], phase: Phase) -> Dict[str, Any]:
-        named_inputs['phase'] = phase
-        return named_input_and_outputs_callable(callable=self.model,
-                                                named_inputs=named_inputs,
-                                                input_names=self.input_names,
-                                                output_names=self.output_names)
+                 output_names: List[str],
+                 loss_output_names: Union[List[str], str] = 'none',
+                 run_on: Optional[List[Phase]] = None):
+        run_on = run_on or list(Phase)  # Runs on all phases
+        super().__init__(model=model,
+                         input_names=input_names,
+                         output_names=output_names,
+                         loss_output_names=loss_output_names,
+                         run_on=run_on,
+                         calculate_gradients=True,
+                         trainable=True)
 
 
 class BrickNotTrainable(Brick):
-    calculate_loss = None
-    update_metrics = None
-    summarize = None
-
     def __init__(self, model: nn.Module,
                  input_names: Union[List[str], Dict[str, str]],
-                 output_names: List[str]):
-        super().__init__()
-        self.input_names = input_names
-        self.output_names = output_names
-        self.model = model
-        if hasattr(model, 'requires_grad_'):
-            self.model.requires_grad_(False)
-
-    @torch.no_grad()
-    def forward(self, named_inputs: Dict[str, Any], phase: Phase) -> Dict[str, Any]:
-        named_inputs['phase'] = phase
-        return named_input_and_outputs_callable(callable=self.model,
-                                                named_inputs=named_inputs,
-                                                input_names=self.input_names,
-                                                output_names=self.output_names)
-
+                 output_names: List[str],
+                 run_on: Optional[List[Phase]] = None,
+                 calculate_gradients: bool = True):
+        run_on = run_on or list(Phase)  # Runs on all phases
+        super().__init__(model=model,
+                         input_names=input_names,
+                         output_names=output_names,
+                         loss_output_names='none',
+                         run_on=run_on,
+                         calculate_gradients=calculate_gradients,
+                         trainable=False)
 
 
 class BrickLoss(Brick):
-    forward = None
-    update_metrics = None
-    summarize = None
-
     def __init__(self, model: nn.Module,
                  input_names: Union[List[str], Dict[str, str]],
-                 output_names: List[str]):
-        super().__init__()
-        self.model = model
-        self.input_names = input_names
-        self.output_names = output_names
+                 output_names: List[str],
+                 loss_output_names: Union[List[str], str] = 'all',
+                 run_on: Optional[List[Phase]] = None,
+                 ):
 
-    def calculate_loss(self, named_inputs: Dict[str, Any]) -> Dict[str, Any]:
-        return named_input_and_outputs_callable(callable=self.model,
-                                                named_inputs=named_inputs,
-                                                input_names=self.input_names,
-                                                output_names=self.output_names)
+        run_on = run_on or [Phase.TRAIN, Phase.TEST, Phase.VALIDATION]
+        super().__init__(model=model,
+                         input_names=input_names,
+                         output_names=output_names,
+                         loss_output_names=loss_output_names,
+                         run_on=run_on,
+                         calculate_gradients=True,
+                         trainable=True)
 
 
-class BrickTorchMetric(Brick):
-    forward = None
-    calculate_loss = None
-
+class BrickTorchMetric(BrickInterface, nn.Module):
     def __init__(self, metric: Union[MetricCollection, Metric],
                  input_names: Union[List[str], Dict[str, str]],
-                 metric_name: Optional[str] = None):
+                 metric_name: Optional[str] = None,
+                 run_on: Optional[List[Phase]] = None,
+                 ):
+
         super().__init__()
+        self.metric = metric
         self.input_names = input_names
+        self.run_on = run_on or [Phase.TRAIN, Phase.TEST, Phase.VALIDATION]
         self.metric_name = metric_name or ''
         if self.metric_name == '' and isinstance(metric, Metric):
-            raise ValueError(f"You will need to specify 'metric_name' when a {Metric} is used.")
+            raise ValueError(f'You will need to specify `metric_name` when a {Metric} is used.')
         self.metrics_train = metric.clone()
         self.metrics_validation = metric.clone()
         self.metrics_test = metric.clone()
@@ -191,14 +219,16 @@ class BrickTorchMetric(Brick):
     def get_metric_name(phase: Phase, metric_name: str) -> str:
         return f'{phase.value}/{metric_name}'
 
-    def update_metrics(self,
-                       named_inputs: Union[List[str], Dict[str, str]],
-                       phase: Phase,
-                       batch_idx: int) -> None:
-        metric = self._select_metric_collection_from_split(phase=phase)
-        named_inputs['phase'] = phase
-        selected_inputs = select_inputs_by_name(named_inputs, input_names=self.input_names)
-        metric.update(*selected_inputs)
+    def forward(self, named_inputs: Union[List[str], Dict[str, str]], phase: Phase) -> Dict[str, Any]:
+        skip_forward = phase not in self.run_on
+        if skip_forward:
+            return {}
+
+        return named_input_and_outputs_callable(callable=self.metric.update, named_inputs=named_inputs, input_names=self.input_names,
+                                                output_names=[], calculate_gradients=False)
+
+    def extract_losses(self, named_outputs: Dict[str, Any]) -> Dict[str, Any]:
+        return {}
 
     def summarize(self, phase: Phase, reset: bool) -> Dict[str, Any]:
         metric = self._select_metric_collection_from_split(phase=phase)

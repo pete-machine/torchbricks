@@ -16,7 +16,7 @@ from utils_testing.lightning_module import LightningBrickCollection
 from torchbricks.bag_of_bricks import resnet_to_brick
 from torchbricks.bag_of_bricks import ImageClassifier, Preprocessor
 
-from torchbricks.bricks import Brick, BrickCollection, BrickLoss, BrickNotTrainable, BrickTorchMetric, BrickTrainable, Phase
+from torchbricks.bricks import BrickInterface, BrickCollection, BrickLoss, BrickNotTrainable, BrickTorchMetric, BrickTrainable
 from torchbricks.custom_metrics import ConcatenatePredictionAndTarget
 
 def create_resnet_18(pretrained=False, num_classes=10):
@@ -26,7 +26,7 @@ def create_resnet_18(pretrained=False, num_classes=10):
     return model
 
 
-def create_cifar_bricks(num_classes: int) -> Dict[str, Brick]:
+def create_cifar_bricks(num_classes: int) -> Dict[str, BrickInterface]:
 
     named_bricks = {
         'preprocessor': BrickNotTrainable(Preprocessor(), input_names=['raw'], output_names=['normalized']),
@@ -116,18 +116,8 @@ if __name__ == '__main__':
 
     train_dataloader = data_module.train_dataloader()
     n_steps_per_epoch = len(train_dataloader)
-    for batch in train_dataloader:
-        named_inputs = {'raw': batch[0], 'targets': batch[1]}
-        break
-    brick_collection = BrickCollection(create_cifar_bricks(num_classes=num_classes))
-    named_outputs, loss = brick_collection.on_step(phase=Phase.TRAIN, named_inputs=named_inputs, batch_idx=0)
-    named_outputs, loss = brick_collection.on_step(phase=Phase.TRAIN, named_inputs=named_inputs, batch_idx=0)
-    named_outputs, loss = brick_collection.on_step(phase=Phase.TRAIN, named_inputs=named_inputs, batch_idx=0)
-    metrics_train = brick_collection.summarize(phase=Phase.TRAIN, reset=True)
 
-    # Forward only runs inference stuff. No metrics, no losses and does not require targets.
-    named_inputs_no_target = {'raw': batch[0]}
-    brick_collection(phase=Phase.TEST, named_inputs=named_inputs_no_target)
+    brick_collection = BrickCollection(create_cifar_bricks(num_classes=num_classes))
 
     def create_optimizers_func(params):
         return create_optimizers(model_parameters=params, max_epochs=args.max_epochs, n_steps_per_epoch=n_steps_per_epoch)

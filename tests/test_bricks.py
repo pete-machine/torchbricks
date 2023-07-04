@@ -11,7 +11,7 @@ from torchmetrics.classification import MulticlassAccuracy
 
 from utils_testing.utils_testing import assert_equal_dictionaries
 
-def create_brick_collection(num_classes: int, num_backbone_featues: int) -> Dict[str, bricks.Brick]:
+def create_brick_collection(num_classes: int, num_backbone_featues: int) -> Dict[str, bricks.BrickInterface]:
     class Preprocessor(nn.Module):
         def forward(self, raw_input: torch.Tensor) -> torch.Tensor:
             return raw_input/2
@@ -64,13 +64,10 @@ def test_brick_collection():
     model = bricks.BrickCollection(bricks=brick_collection)
     named_inputs = {'labels': torch.tensor(range(num_classes), dtype=torch.float64), 'raw': torch.zeros((3, 24, 24))}
 
-    phase = Phase.TRAIN
-    model(phase=phase, named_inputs=named_inputs)
-    model.on_step(phase=phase, named_inputs=named_inputs, batch_idx=0)
-    model.on_step(phase=phase, named_inputs=named_inputs, batch_idx=1)
-    named_outputs, losses = model.on_step(phase=phase, named_inputs=named_inputs, batch_idx=2)
-    metrics = model.summarize(phase=phase, reset=True)
+    named_outputs = model(phase=Phase.TRAIN, named_inputs=named_inputs)
+    metrics = model.summarize(phase=Phase.TRAIN, reset=True)
 
+    losses = model.extract_losses(named_outputs=named_outputs)
     assert set(metrics) == expected_named_metrics
     assert expected_forward_named_outputs.union(expected_named_losses) == set(named_outputs)
     assert expected_named_losses == set(losses)
@@ -87,14 +84,13 @@ def test_brick_collection_no_metrics():
     model = bricks.BrickCollection(bricks=brick_collection)
 
     named_inputs = {'labels': torch.tensor(range(num_classes), dtype=torch.float64), 'raw': torch.zeros((3, 24, 24))}
-    phase = Phase.TRAIN
-    named_outputs = model(phase=phase, named_inputs=named_inputs)
+    named_outputs = model(phase=Phase.INFERENCE, named_inputs=named_inputs)
     assert expected_forward_named_outputs == set(named_outputs)
 
-    model.on_step(phase=phase, named_inputs=named_inputs, batch_idx=0)
-    model.on_step(phase=phase, named_inputs=named_inputs, batch_idx=1)
-    named_outputs, losses = model.on_step(phase=phase, named_inputs=named_inputs, batch_idx=2)
-    metrics = model.summarize(phase=phase, reset=True)
+    named_outputs = model(phase=Phase.TRAIN, named_inputs=named_inputs)
+    named_outputs = model(phase=Phase.TRAIN, named_inputs=named_inputs)
+    metrics = model.summarize(phase=Phase.TRAIN, reset=True)
+    losses = model.extract_losses(named_outputs=named_outputs)
     assert metrics == expected_named_metrics
     assert expected_forward_named_outputs.union(expected_named_losses) == set(named_outputs)
     assert expected_named_losses == set(losses)
@@ -112,14 +108,14 @@ def test_brick_collection_no_metrics_no_losses():
     model = bricks.BrickCollection(bricks=brick_collection)
 
     named_inputs = {'labels': torch.tensor(range(num_classes), dtype=torch.float64), 'raw': torch.zeros((3, 24, 24))}
-    phase = Phase.TRAIN
-    named_outputs = model(phase=phase, named_inputs=named_inputs)
+    named_outputs = model(phase= Phase.INFERENCE, named_inputs=named_inputs)
     assert expected_forward_named_outputs == set(named_outputs)
 
-    model.on_step(phase=phase, named_inputs=named_inputs, batch_idx=0)
-    model.on_step(phase=phase, named_inputs=named_inputs, batch_idx=1)
-    named_outputs, losses = model.on_step(phase=phase, named_inputs=named_inputs, batch_idx=2)
-    metrics = model.summarize(phase=phase, reset=True)
+    model(phase=Phase.TRAIN, named_inputs=named_inputs)
+    model(phase=Phase.TRAIN, named_inputs=named_inputs)
+    named_outputs = model(phase=Phase.TRAIN, named_inputs=named_inputs)
+    metrics = model.summarize(phase=Phase.TRAIN, reset=True)
+    losses = model.extract_losses(named_outputs=named_outputs)
     assert metrics == expected_named_metrics
     assert expected_forward_named_outputs.union(expected_named_losses) == set(named_outputs)
     assert expected_named_losses == losses
@@ -178,9 +174,9 @@ def test_nested_bricks():
     assert_equal_dictionaries(outputs0, expected_outputs)
 
 
-    outputs0, _ = brick_collection.on_step(named_inputs=named_inputs, phase=Phase.TRAIN, batch_idx=0)
-    outputs1, _ = brick_collection_dict.on_step(named_inputs=named_inputs, phase=Phase.TRAIN, batch_idx=0)
-    outputs2, _ = brick_collection_flat.on_step(named_inputs=named_inputs, phase=Phase.TRAIN, batch_idx=0)
+    outputs0 = brick_collection(named_inputs=named_inputs, phase=Phase.TRAIN)
+    outputs1 = brick_collection_dict(named_inputs=named_inputs, phase=Phase.TRAIN)
+    outputs2 = brick_collection_flat(named_inputs=named_inputs, phase=Phase.TRAIN)
 
     assert_equal_dictionaries(outputs0, outputs1)
     assert_equal_dictionaries(outputs1, outputs2)
@@ -200,7 +196,7 @@ def test_brick_torch_metric_single_metric():
     batch_logits = torch.rand((1, num_classes))
     phase = Phase.TRAIN
     named_inputs = {'logits': batch_logits, 'targets': torch.ones((1), dtype=torch.int64)}
-    model.on_step(phase=phase, named_inputs=named_inputs, batch_idx=0)
+    model(phase=phase, named_inputs=named_inputs)
     metrics = model.summarize(phase=phase, reset=True)
 
     assert list(metrics) == [f'{phase.value}/{metric_name}']
@@ -232,7 +228,7 @@ def test_brick_torch_metric_multiple_metric():
     batch_logits = torch.rand((1, num_classes))
     phase = Phase.TRAIN
     named_inputs = {'logits': batch_logits, 'targets': torch.ones((1), dtype=torch.int64)}
-    model.on_step(phase=phase, named_inputs=named_inputs, batch_idx=0)
+    model(named_inputs=named_inputs, phase=phase)
     metrics = model.summarize(phase=phase, reset=True)
 
     expected_metrics = {f'{phase.value}/{name}' for name in metric_collection}
@@ -262,22 +258,19 @@ def iterate_phases():
 
 
 @pytest.mark.slow
-def test_compile():
+@pytest.mark.parametrize('phase', [Phase.TRAIN, Phase.INFERENCE])
+def test_compile(phase: Phase):
     num_classes = 3
     brick_collection = create_brick_collection(num_classes=num_classes, num_backbone_featues=10)
     model = BrickCollection(brick_collection)
 
     named_inputs = {'labels': torch.tensor(range(num_classes), dtype=torch.float64), 'raw': torch.zeros((3, 24, 24))}
-    forward_expected = model(named_inputs=named_inputs, phase=Phase.TRAIN)
-    on_step_expected = model.on_step(named_inputs=named_inputs, phase=Phase.TRAIN, batch_idx=0)
+    forward_expected = model(named_inputs=named_inputs, phase=phase)
 
     model_compiled = torch.compile(model)
-    forward_actual = model_compiled(named_inputs=named_inputs, phase=Phase.TRAIN)
-    on_step_actual = model_compiled.on_step(named_inputs=named_inputs, phase=Phase.TRAIN, batch_idx=0)
+    forward_actual = model_compiled(named_inputs=named_inputs, phase=phase)
 
     assert_equal_dictionaries(forward_expected, forward_actual, is_close=True)
-    assert_equal_dictionaries(on_step_expected[0], on_step_actual[0], is_close=True)
-    assert_equal_dictionaries(on_step_expected[1], on_step_actual[1], is_close=True)
 
 # def test_export_onnx_trace():
 #     num_classes = 3
