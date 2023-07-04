@@ -204,7 +204,7 @@ def test_brick_torch_metric_single_metric():
 
 def test_brick_torch_metric_single_metric_assert():
     metric_name = None
-    with pytest.raises(ValueError, match="You will need to specify 'metric_name'"):
+    with pytest.raises(ValueError, match='Specify `metric_name` when using'):
         BrickTorchMetric(MulticlassAccuracy(num_classes=10), input_names=['logits', 'targets'], metric_name=metric_name)
 
 

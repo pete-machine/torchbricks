@@ -6,7 +6,7 @@ import torch
 def check_input_names(named_inputs: Dict[str, Any],
                       input_names: List[str]):
     is_subset = set(input_names).issubset(named_inputs)
-    assert is_subset, (f'Not all {input_names=} exists in `named_inputs={list(named_inputs)}`. The following expected names '
+    assert is_subset, (f'Not all `{input_names=}` exists in `named_inputs={list(named_inputs)}`. The following expected names '
                        f'{list(set(input_names).difference(named_inputs))} does not exist in the dictionary of `named_inputs`')
 
 
@@ -29,7 +29,7 @@ def name_callable_outputs(outputs: Any,
     if not isinstance(outputs, Tuple):
         outputs = (outputs, )
     assert len(outputs) == len(output_names), (f'The number of specified output names {output_names=} '
-                                               f"does not match the actual number of outputs '{len(outputs)=}'")
+                                               f'does not match the actual number of outputs `{len(outputs)=}`')
     return dict(zip(output_names, outputs))
 
 

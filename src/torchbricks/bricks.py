@@ -201,7 +201,7 @@ class BrickTorchMetric(BrickInterface, nn.Module):
         self.run_on = run_on or [Phase.TRAIN, Phase.TEST, Phase.VALIDATION]
         self.metric_name = metric_name or ''
         if self.metric_name == '' and isinstance(metric, Metric):
-            raise ValueError(f'You will need to specify `metric_name` when a {Metric} is used.')
+            raise ValueError(f'Specify `metric_name` when using {Metric}.')
         self.metrics_train = metric.clone()
         self.metrics_validation = metric.clone()
         self.metrics_test = metric.clone()

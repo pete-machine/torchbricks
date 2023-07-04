@@ -11,10 +11,10 @@ def test_named_input_and_outputs_callable_single_in_single_out():
     named_outputs = named_input_and_outputs_callable(x2, named_inputs=named_inputs, input_names=['in'], output_names=['out'])
     assert named_outputs == {'out': 6}
 
-    with pytest.raises(AssertionError, match="Not all 'input_names="):
+    with pytest.raises(AssertionError, match='Not all `input_names='):
         named_input_and_outputs_callable(x2, named_inputs=named_inputs,  input_names=['not_a_name'], output_names=['out'])
 
-    with pytest.raises(AssertionError, match="Not all 'input_names="):
+    with pytest.raises(AssertionError, match='Not all `input_names='):
         named_input_and_outputs_callable(x2, named_inputs=named_inputs,  input_names=['in', 'in1'], output_names=['out'])
 
     named_outputs = named_input_and_outputs_callable(x2, named_inputs=named_inputs, input_names={'in': 'value'}, output_names=['out'])
