@@ -295,6 +295,7 @@ MISSING
 - [x] Minor: Make Brick an abstract class
 - [x] Convert torchvision resnet models to only a backbone brick.
 - [x] Make readme a notebook
+- [ ] Automatically convert jupyter notebook to `README.md`
 - [ ] Use pymy or pyright to do static code checks. 
 - [ ] Ensure that all examples in the `README.md` are working with easy to use modules. 
 - [ ] Test: Make it optional if gradients can be passed through NonTrainableBrick without weights being optimized
