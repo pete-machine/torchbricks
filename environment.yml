@@ -25,7 +25,7 @@ dependencies:
   - coverage=7.2.5
   - pytest=7.3.1
   - pytest-cov=4.0.0
-  - beartype   0.14.1
+  - beartype=0.14.1
 
   # Build and release stuff
   - bumpver
