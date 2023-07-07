@@ -27,6 +27,14 @@ repos:
       args: [--fix, --exit-non-zero-on-fix]
       exclude: "README.md"
 
+- repo: local
+  hooks:
+    - id: clear-notebook
+      name: Clear outputs of README notebook
+      entry: jupyter nbconvert --clear-output --inplace
+      language: system
+      files: README.ipynb
+
 - repo: https://github.com/mwouts/jupytext
   rev: v1.14.5
   hooks:
@@ -34,13 +42,7 @@ repos:
       files: README.ipynb
       args: [--from, ipynb, --to, markdown]
 
-# - repo: local
-#   hooks:
-#     - id: clear-readme
-#       name: Clear outputs of README notebook
-#       entry: jupyter nbconvert --clear-output --to notebook --output-dir='./build/'
-#       language: system
-#       files: README.ipynb
+
 #     - id: create-markdown-from-readme
 #       name: Make markdown readme file
 #       entry: jupyter nbconvert --to markdown
