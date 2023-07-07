@@ -5,9 +5,11 @@ from torchbricks.bricks import BrickCollection, BrickLoss, BrickTorchMetric, Pha
 from torchbricks import custom_metrics
 from typing import Dict
 import torch
+import onnx
 from torch import nn
 import torchmetrics
 from torchmetrics.classification import MulticlassAccuracy
+from torchbricks.bricks import export_as_onnx
 
 from utils_testing.utils_testing import assert_equal_dictionaries
 
@@ -264,7 +266,7 @@ def test_compile(phase: Phase):
     brick_collection = create_brick_collection(num_classes=num_classes, num_backbone_featues=10)
     model = BrickCollection(brick_collection)
 
-    named_inputs = {'labels': torch.tensor(range(num_classes), dtype=torch.float64), 'raw': torch.zeros((3, 24, 24))}
+    named_inputs = {'labels': torch.tensor(range(num_classes), dtype=torch.float64), 'raw': torch.zeros((1, 3, 24, 24))}
     forward_expected = model(named_inputs=named_inputs, phase=phase)
 
     model_compiled = torch.compile(model)
@@ -272,7 +274,39 @@ def test_compile(phase: Phase):
 
     assert_equal_dictionaries(forward_expected, forward_actual, is_close=True)
 
-# def test_export_onnx_trace():
+
+def test_export_onnx_trace(tmp_path: Path):
+    num_classes = 3
+    brick_collection = create_brick_collection(num_classes=num_classes, num_backbone_featues=10)
+    model = BrickCollection(brick_collection)
+    named_inputs = {'raw': torch.zeros((1, 3, 64, 64))}
+
+    phase = Phase.EXPORT
+    named_outputs = model(named_inputs, phase=phase, return_inputs=False)
+    # remove_from_outputs = ["phase"] + list(named_inputs)
+    expected_input = list(named_inputs)
+    expected_outputs = list(named_outputs)
+
+    path_onnx = Path(tmp_path / 'model.onnx')
+
+    dynamic_batch_size_configs = [False, True]
+    for dynamic_batch_size in dynamic_batch_size_configs:
+        export_as_onnx(brick_collection=model, named_inputs=named_inputs, path_onnx=path_onnx, phase=phase,
+                       dynamic_batch_size=dynamic_batch_size)
+
+        assert path_onnx.exists()
+        onnx_model = onnx.load(path_onnx)
+
+        output_names_graph = set(output.name for output in onnx_model.graph.output)
+        assert set(expected_outputs) == output_names_graph
+
+        input_names_graph = set(input.name for input in onnx_model.graph.input)
+        assert set(expected_input) == input_names_graph
+
+        onnx.checker.check_model(onnx_model)
+
+
+# def test_export_jit_script():
 #     num_classes = 3
 #     brick_collection = create_brick_collection(num_classes=num_classes, num_backbone_featues=10)
 #     model = BrickCollection(brick_collection)

@@ -3,6 +3,7 @@ from typing import Any, Callable, Dict, List, Tuple, Union
 import torch
 
 
+
 def check_input_names(named_inputs: Dict[str, Any],
                       input_names: List[str]):
     is_subset = set(input_names).issubset(named_inputs)

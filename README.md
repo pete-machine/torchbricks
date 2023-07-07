@@ -1,3 +1,17 @@
+---
+jupyter:
+  jupytext:
+    text_representation:
+      extension: .md
+      format_name: markdown
+      format_version: '1.3'
+      jupytext_version: 1.14.5
+  kernelspec:
+    display_name: torchbricks
+    language: python
+    name: python3
+---
+
 # TorchBricks
 
 [![codecov](https://codecov.io/gh/PeteHeine/torchbricks/branch/main/graph/badge.svg?token=torchbricks_token_here)](https://codecov.io/gh/PeteHeine/torchbricks)
@@ -8,19 +22,20 @@ TorchBricks builds pytorch models using small reuseable and decoupled parts - we
 The concept is simple and flexible and allows you to more easily combine and swap out parts of the model (preprocessor, backbone, neck, head or post-processor), change the task or extend it with multiple tasks.
 
 
+<!-- #region -->
 
 ## Install it with pip
 
 ```bash
 pip install torchbricks
 ```
+<!-- #endregion -->
 
 
 ## Basic use-case: Image classification
 Let us see it in action:
 
 First we specify regular pytorch modules: A preprocessor, a model and a classifier
-
 
 ```python
 import torch
@@ -49,9 +64,9 @@ class ClassifierDummy(nn.Module):
 
 We can now use torchbricks to define how the modules are connected
 
-
 ```python
-from torchbricks.bricks import BrickCollection, BrickNotTrainable, BrickTrainable, Phase
+from torchbricks.bricks import BrickCollection, BrickNotTrainable, BrickTrainable
+from torchbricks.bricks import Phase
 
 # Defining model from bricks
 bricks = {
@@ -69,31 +84,31 @@ print(outputs.keys())
 brick_collection
 ```
 
-All modules are added as entries in a regular dictionary, and for each module we 1) specify a name
-2) if it is trainable or not (`BrickTrainable`/`BrickNotTrainable`) and 3) input and output names.
+All modules are added as entries in a regular dictionary, and for each module we 1) specify a name 
+2) if it is trainable or not (`BrickTrainable`/`BrickNotTrainable`) and 3) input and output names. 
+   
+Finally, bricks are collected in a `BrickCollection`. A `BrickCollection` is a 
+regular `nn.Module` with a `forward`-function, `to` to move to a specific device/precision, 
+you can save/load a model, management of parameters, export model as either onnx/TorchScript etc. 
 
-Finally, bricks are collected in a `BrickCollection`. A `BrickCollection` is a
-regular `nn.Module` with a `forward`-function, `to` to move to a specific device/precision,
-you can save/load a model, management of parameters, export model as either onnx/TorchScript etc.
-
-Furthermore a brick collection acts as a simple DAG, it accepts a dictionary (`named_inputs`),
-executes each bricks and ensures that the outputs are passed to the inputs of other bricks with matching names.
+Furthermore a brick collection acts as a simple DAG, it accepts a dictionary (`named_inputs`), 
+executes each bricks and ensures that the outputs are passed to the inputs of other bricks with matching names. 
 Structuring the model as a DAG, makes it easy to add/remove outputs for a given module, add new modules to a given model
-and build completely new models from reusable parts.
+and build completely new models from reusable parts. 
 
 Note also that we set `phase=Phase.TRAIN` to explicitly specify if we are doing training, validation, test or inference.
 Specifying a phase is important, if we want a module to act in a specific way during specific phases.
-We will get back to this later.
+We will get back to this later. 
 
-Not shown here, a `BrickCollection` also supports a nested dictionary of bricks. A nested brick collections acts the same,
-but it becomes easier to add and remove sub-collections bricks.
+Not shown here, a `BrickCollection` also supports a nested dictionary of bricks. A nested brick collections acts the same, 
+but it becomes easier to add and remove sub-collections bricks. 
+
 
 ## Bag of bricks - reusable bricks modules
-We provide a bag-of-bricks with commonly used `nn.Module`s
+We provide a bag-of-bricks with commonly used `nn.Module`s 
 
 Below we create a brick collection with a real world example including a `Preprocessor`, an adaptor function to convert
-torchvision resnet models into a backbone brick (with no classifier) and an `ImageClassifier`.
-
+torchvision resnet models into a backbone brick (with no classifier) and an `ImageClassifier`. 
 
 ```python
 from torchvision.models import resnet18
@@ -111,11 +126,10 @@ bricks = {
 ```
 
 ## Use-case: Bricks `on_step`-function for training and evaluation
-In above examples, we have showed how to compose the model with trainable and non-trainable bricks, and how a dictionary of tensors
+In above examples, we have showed how to compose the model with trainable and non-trainable bricks, and how a dictionary of tensors 
 is passed to the forward function... But TorchBricks goes beyond that.
 
 An important feature of a brick collection is that is the `on_step`-function to also calculate metrics and losses.
-
 
 ```python
 from torchbricks.bricks import BrickLoss, BrickTorchMetric
@@ -126,7 +140,7 @@ bricks = {
     'backbone': resnet_brick,
     'image_classifier': BrickTrainable(ImageClassifier(num_classes=num_classes, n_features=resnet_brick.model.n_backbone_features),
                                      input_names=['features'], output_names=['logits', 'probabilities', 'class_prediction']),
-    'accuracy': BrickTorchMetric(MulticlassAccuracy(num_classes=num_classes), input_names=['class_prediction', 'targets'],
+    'accuracy': BrickTorchMetric(MulticlassAccuracy(num_classes=num_classes), input_names=['class_prediction', 'targets'], 
                                       metric_name="Accuracy"),
     'loss': BrickLoss(model=nn.CrossEntropyLoss(), input_names=['logits', 'targets'], output_names=['loss_ce'])
 }
@@ -145,41 +159,41 @@ metrics = brick_collection.summarize(phase=Phase.TRAIN, reset=True)
 print(f"{metrics=}, {losses=}")
 ```
 
-In above example we extend our brick collection with a `BrickTorchMetric` brick for handling metrics and a `BrickLoss` to handle our
-loss-function.
+In above example we extend our brick collection with a `BrickTorchMetric` brick for handling metrics and a `BrickLoss` to handle our 
+loss-function. 
 
-For metrics, we rely on the [TorchMetrics](https://torchmetrics.readthedocs.io/en/stable/) library and passes either a single
-metric (`torchmetrics.Metric`) or collection of metrics (`torchmetrics.MetricCollection`) to `BrickTorchMetric`.
+For metrics, we rely on the [TorchMetrics](https://torchmetrics.readthedocs.io/en/stable/) library and passes either a single 
+metric (`torchmetrics.Metric`) or collection of metrics (`torchmetrics.MetricCollection`) to `BrickTorchMetric`. 
 
-Note also that we continue to use input names and output names to easily define how modules are connected.
+Note also that we continue to use input names and output names to easily define how modules are connected. 
 
-On each `on_step`, we calculate model outputs, losses and metrics for each batch. Metrics are aggregated internally in `BrickTorchMetric`
-and only returned with the `summarize`-call. We set `reset=True` to reset metric aggregation.
+On each `on_step`, we calculate model outputs, losses and metrics for each batch. Metrics are aggregated internally in `BrickTorchMetric` 
+and only returned with the `summarize`-call. We set `reset=True` to reset metric aggregation. 
 
-Note also that our metric (`Accuracy`) has been added a prefix, so it becomes `train/Accuracy` and demonstrates the
+Note also that our metric (`Accuracy`) has been added a prefix, so it becomes `train/Accuracy` and demonstrates the 
+
 
 ## Use-case: Training with a collections of bricks
-By packing model modules, metrics and loss-functions into a brick collection and providing a `on_step`-function, we can more easily
+By packing model modules, metrics and loss-functions into a brick collection and providing a `on_step`-function, we can more easily 
 inject any desired brick collection into your custom trainer without doing modifications to trainer.
 
 ### Use-case: Training with pytorch-lightning trainer
 I like and love pytorch-lightning! We can avoid writing the easy-to-get-wrong training loop, write validation/test scrips.
 
-Pytorch lightning will create logs, ensures training is done efficiently on any device (CPU, GPU, TPU), on multiple/distributed devices
+Pytorch lightning will create logs, ensures training is done efficiently on any device (CPU, GPU, TPU), on multiple/distributed devices 
 with reduced precision and much more.
 
 However, one issue I found myself having when wanting to extend my custom pytorch-lightning module (`LightningModule`) is that it forces an
-object oriented style with multiple levels of inheritance. This is not necessarily bad, but it makes it hard to reuse
-code across projects and generally made the code complicated.
+object oriented style with multiple levels of inheritance. This is not necessarily bad, but it makes it hard to reuse 
+code across projects and generally made the code complicated. 
 
 With a brick collection you should rarely change or inherit your lightning module, instead you inject the model, metrics and loss functions
 into a lightning module. Changes to preprocessor, backbone, necks, heads, metrics and losses are done on the outside
-and injected into the lightning module.
+and injected into the lightning module. 
 
-Below is an example of how you could inject a brick collection into with pytorch-lightning.
-We have created `LightningBrickCollection` ([available here](https://github.com/PeteHeine/torchbricks/blob/main/scripts/lightning_module.py))
-as an example for you to use.
-
+Below is an example of how you could inject a brick collection into with pytorch-lightning. 
+We have created `LightningBrickCollection` ([available here](https://github.com/PeteHeine/torchbricks/blob/main/scripts/lightning_module.py)) 
+as an example for you to use. 
 
 
 ```python
@@ -210,12 +224,12 @@ trainer.test(bricks_lightning_module, datamodule=data_module)
 After running experiments, we now realize that we also wanna do semantic segmentation.
 This is how it would look like:
 
+
 By wrapping both core model computations, metrics and loss functions into a single brick collection, we can more easily swap between
 running model experiments in notebooks, trainings
 
 We provide a `forward` function to easily run model inference without targets and an `on_step` function
 to easily get metrics and losses in both
-
 
 ```python
 missing_implementation = True
@@ -245,9 +259,11 @@ MISSING
 
 
 
+
 ## TorchMetric.MetricCollection
 
 MISSING
+
 
 
 
@@ -259,7 +275,7 @@ MISSING
 
 
 
-
+<!-- #region -->
 ##
 
 ## What are we missing?
@@ -278,9 +294,14 @@ MISSING
 - [x] Minor: Currently, `input_names` and `output_names` support positional arguments, but we should also support keyword arguments.
 - [x] Minor: Make Brick an abstract class
 - [x] Convert torchvision resnet models to only a backbone brick.
-- [ ] Make readme a notebook
-- [ ] Ensure that all examples in the `README.md` are working with easy to use modules.
+- [x] Make readme a notebook
+- [ ] Use pymy or pyright to do static code checks. 
+- [ ] Ensure that all examples in the `README.md` are working with easy to use modules. 
 - [ ] Test: Make it optional if gradients can be passed through NonTrainableBrick without weights being optimized
+- [ ] Decide: Add phase as an internal state and not in the forward pass:
+  - Minor Pros: Tracing (to get onnx model) requires only torch.Tensors only as input - we avoid making an adapter class. 
+  - Minor Cons: State gets hidden away - implicit instead of explicit.
+  - Minor Pros: Similar to eval/training 
 
 
 ## How does it really work?
@@ -301,3 +322,7 @@ Read the [CONTRIBUTING.md](CONTRIBUTING.md) file.
 ### Activating the environment
 
     conda activate torchbricks
+
+<!-- #endregion -->
+
+

@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from enum import Enum
+from pathlib import Path
 from typing import Dict, Any, List, Optional, Union
+import torch
 from torch import nn
 from torchmetrics import MetricCollection, Metric
 
@@ -53,8 +55,7 @@ def parse_argument_run_on(run_on: Union[List[Phase], str]) -> List[Phase]:
     assert isinstance(run_on, List), f'"run_on" should be "all", "none" or List[Phases]. It is {run_on=}'
     return run_on
 
-
-class Brick(nn.Module, BrickInterface):
+class BrickModule(nn.Module, BrickInterface):
     def __init__(self, model: nn.Module,
                  input_names: Union[List[str], Dict[str, str], str],
                  output_names: List[str],
@@ -104,12 +105,15 @@ class BrickCollection(nn.ModuleDict, BrickInterface):  # Note BrickCollection is
     def __init__(self, bricks: Dict[str, BrickInterface]) -> None:
         super().__init__(convert_nested_dict_to_nested_brick_collection(bricks))
 
-    def forward(self, named_inputs: Dict[str, Any], phase: Phase) -> Dict[str, Any]:
-        named_inputs = dict(named_inputs)  # To keep the argument `named_inputs` unchanged
+    def forward(self, named_inputs: Dict[str, Any], phase: Phase, return_inputs: bool = True) -> Dict[str, Any]:
+        gathered_named_io = dict(named_inputs)  # To keep the argument `named_inputs` unchanged
         for brick in self.values():
-            results = brick.forward(phase=phase, named_inputs=named_inputs)
-            named_inputs.update(results)
-        return named_inputs
+            results = brick.forward(phase=phase, named_inputs=gathered_named_io)
+            gathered_named_io.update(results)
+
+        if not return_inputs:
+            [gathered_named_io.pop(name_input) for name_input in ['phase'] + list(named_inputs)]
+        return gathered_named_io
 
     def extract_losses(self, named_outputs: Dict[str, Any]) -> Dict[str, Any]:
         named_losses = {}
@@ -138,7 +142,7 @@ def convert_nested_dict_to_nested_brick_collection(bricks: Dict[str, Union[Brick
         return BrickCollection(converted_bricks)
 
 
-class BrickTrainable(Brick):
+class BrickTrainable(BrickModule):
     def __init__(self, model: nn.Module,
                  input_names: Union[List[str], Dict[str, str]],
                  output_names: List[str],
@@ -154,7 +158,7 @@ class BrickTrainable(Brick):
                          trainable=True)
 
 
-class BrickNotTrainable(Brick):
+class BrickNotTrainable(BrickModule):
     def __init__(self, model: nn.Module,
                  input_names: Union[List[str], Dict[str, str]],
                  output_names: List[str],
@@ -170,7 +174,7 @@ class BrickNotTrainable(Brick):
                          trainable=False)
 
 
-class BrickLoss(Brick):
+class BrickLoss(BrickModule):
     def __init__(self, model: nn.Module,
                  input_names: Union[List[str], Dict[str, str]],
                  output_names: List[str],
@@ -244,3 +248,42 @@ class BrickTorchMetric(BrickInterface, nn.Module):
         else:
             raise NameError()
         return metrics
+
+
+class OnnxExportAdaptor(nn.Module):
+    def __init__(self, model: nn.Module, phase: Phase) -> None:
+        super().__init__()
+        self.model = model
+        self.phase = phase
+
+    def forward(self, named_inputs):
+        named_outputs = self.model.forward(named_inputs=named_inputs, phase=self.phase, return_inputs=False)
+        return named_outputs
+
+
+def export_as_onnx(brick_collection: BrickCollection,
+                   named_inputs: Dict[str, torch.Tensor],
+                   path_onnx: Path,
+                   dynamic_batch_size: bool,
+                   phase: Phase = Phase.EXPORT,
+                   **onnx_export_kwargs):
+
+    outputs = brick_collection(named_inputs=named_inputs, phase=phase, return_inputs=False)
+    onnx_exportable = OnnxExportAdaptor(model=brick_collection, phase=phase)
+    output_names = list(outputs)
+    input_names = list(named_inputs)
+
+    if dynamic_batch_size:
+        if 'dynamic_axes' in onnx_export_kwargs:
+            raise ValueError("Setting both 'dynamic_batch_size==True' and defining 'dynamic_axes' in 'onnx_export_kwargs' is not allowed. ")
+        io_names = input_names + output_names
+        dynamic_axes = {io_name: {0: 'batch_size'} for io_name in io_names}
+        onnx_export_kwargs['dynamic_axes'] = dynamic_axes
+
+    torch.onnx.export(model=onnx_exportable,
+                      args=({'named_inputs': named_inputs}, ),
+                      f=str(path_onnx),
+                      verbose=True,
+                      input_names=input_names,
+                      output_names=output_names,
+                      **onnx_export_kwargs)
