@@ -40,7 +40,7 @@ repos:
   hooks:
     - id: jupytext
       files: README.ipynb
-      args: [--from, ipynb, --to, markdown, --hide_notebook_metadata, "true"]
+      args: [--from, ipynb, --to, markdown, --opt, hide_notebook_metadata=True]
 
 
 #     - id: create-markdown-from-readme

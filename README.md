@@ -1,6 +1,9 @@
+<!--
+
 ---
 jupyter:
   jupytext:
+    hide_notebook_metadata: true
     text_representation:
       extension: .md
       format_name: markdown
@@ -11,6 +14,8 @@ jupyter:
     language: python
     name: python3
 ---
+
+-->
 
 # TorchBricks
 
@@ -296,6 +301,7 @@ MISSING
 - [x] Convert torchvision resnet models to only a backbone brick.
 - [x] Make readme a notebook
 - [x] Automatically convert jupyter notebook to `README.md`
+- [x] Remove README.md header
 - [ ] Use pymy or pyright to do static code checks. 
 - [ ] Ensure that all examples in the `README.md` are working with easy to use modules. 
 - [ ] Test: Make it optional if gradients can be passed through NonTrainableBrick without weights being optimized
