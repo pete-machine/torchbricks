@@ -286,15 +286,7 @@ MISSING
 ## What are we missing?
 
 
-- [Semi] ~~Proper~~ Added a link to `LightningBrickCollection` for other people to use
-- [ ] Collection of helper modules. Preprocessors, Backbones, Necks/Upsamplers, ImageClassification, SemanticSegmentation, ObjectDetection
-  - [ ] All the modules in the README should be easy to import as actually modules.
-  - [ ] Make common brick collections: BricksImageClassification, BricksSegmentation, BricksPointDetection, BricksObjectDetection
-- [ ] Support preparing data in the dataloader?
-- [ ] Make common Visualizations with pillow - not opencv to not blow up the required dependencies. ImageClassification, Segmentation, ObjectDetection
-- [ ] Make an export to onnx function and add it to the README.md
-- [ ] Proper handling of train, val and test. What to do with gradients, nn.Module parameters and internal eval/train state
-- [ ] Consider: If train, val and test phase has no impact on bricks, it should be passed as a regular named input.
+- [x] ~~Proper~~ Added a link to `LightningBrickCollection` for other people to use
 - [x] Minor: BrickCollections supports passing a dictionary with BrickCollections. But we should also convert a nested dictionary into a nested brick collections
 - [x] Minor: Currently, `input_names` and `output_names` support positional arguments, but we should also support keyword arguments.
 - [x] Minor: Make Brick an abstract class
@@ -302,14 +294,25 @@ MISSING
 - [x] Make readme a notebook
 - [x] Automatically convert jupyter notebook to `README.md`
 - [x] Remove README.md header
-- [ ] Use pymy or pyright to do static code checks. 
+- [x] Make an export to onnx function 
+- [x] Make it optional if gradients can be passed through NonTrainableBrick without weights being optimized
+- [ ] Update README.md to match the new bricks. 
+  - [ ] Start with basic bricks example. 
+  - [ ] Use loss-function to show that Phase decided on what is being executed. 
+  - [ ] Introduce metrics by it-self in another example
+- [ ] Add onnx export example to the README.md
 - [ ] Ensure that all examples in the `README.md` are working with easy to use modules. 
-- [ ] Test: Make it optional if gradients can be passed through NonTrainableBrick without weights being optimized
+- [ ] Use pymy or pyright to do static code checks. 
 - [ ] Decide: Add phase as an internal state and not in the forward pass:
   - Minor Pros: Tracing (to get onnx model) requires only torch.Tensors only as input - we avoid making an adapter class. 
   - Minor Cons: State gets hidden away - implicit instead of explicit.
   - Minor Pros: Similar to eval/training 
 
+- [ ] Collection of helper modules. Preprocessors, Backbones, Necks/Upsamplers, ImageClassification, SemanticSegmentation, ObjectDetection
+  - [ ] All the modules in the README should be easy to import as actually modules.
+  - [ ] Make common brick collections: BricksImageClassification, BricksSegmentation, BricksPointDetection, BricksObjectDetection
+- [ ] Support preparing data in the dataloader?
+- [ ] Make common Visualizations with pillow - not opencv to not blow up the required dependencies. ImageClassification, Segmentation, ObjectDetection
 
 ## How does it really work?
 ????
