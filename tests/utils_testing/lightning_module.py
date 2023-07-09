@@ -25,10 +25,10 @@ class LightningBrickCollection(LightningModule):
 
     def _on_epoch_end(self, phase: Phase):
         metrics = self.bricks.summarize(phase=phase, reset=True)
-        def is_single_value_tensor(tensor):
+        def is_single_value(tensor):
             return isinstance(tensor, torch.Tensor) and tensor.ndim == 0
 
-        single_valued_metrics = {metric_name: value for metric_name, value in metrics.items() if is_single_value_tensor(value)}
+        single_valued_metrics = {f'{phase.value}/{metric_name}': value for metric_name, value in metrics.items() if is_single_value(value)}
         self.log_dict(single_valued_metrics)
 
     def _step(self, phase: Phase, batch, batch_idx: int):

@@ -137,7 +137,7 @@ is passed to the forward function... But TorchBricks goes beyond that.
 An important feature of a brick collection is that is the `on_step`-function to also calculate metrics and losses.
 
 ```python
-from torchbricks.bricks import BrickLoss, BrickTorchMetric
+from torchbricks.bricks import BrickLoss, BrickMetricCollection
 from torchmetrics.classification import MulticlassAccuracy
 
 bricks = {
@@ -145,7 +145,7 @@ bricks = {
     'backbone': resnet_brick,
     'image_classifier': BrickTrainable(ImageClassifier(num_classes=num_classes, n_features=resnet_brick.model.n_backbone_features),
                                      input_names=['features'], output_names=['logits', 'probabilities', 'class_prediction']),
-    'accuracy': BrickTorchMetric(MulticlassAccuracy(num_classes=num_classes), input_names=['class_prediction', 'targets'], 
+    'accuracy': BrickMetricCollection(MulticlassAccuracy(num_classes=num_classes), input_names=['class_prediction', 'targets'], 
                                       metric_name="Accuracy"),
     'loss': BrickLoss(model=nn.CrossEntropyLoss(), input_names=['logits', 'targets'], output_names=['loss_ce'])
 }
@@ -296,18 +296,22 @@ MISSING
 - [x] Remove README.md header
 - [x] Make an export to onnx function 
 - [x] Make it optional if gradients can be passed through NonTrainableBrick without weights being optimized
+- [ ] Refactor MetricCollection to have flag to return metrics.
 - [ ] Update README.md to match the new bricks. 
   - [ ] Start with basic bricks example. 
   - [ ] Use loss-function to show that Phase decided on what is being executed. 
   - [ ] Introduce metrics by it-self in another example
 - [ ] Add onnx export example to the README.md
+- [ ] Make brick base class with input_names, output_names and run_on - inherit this from other bricks. 
+  - [ ] Pros: We might include other non-torch modules later. 
+  - [ ] Do not necessarily pass a Phase-object. Consider also passing it as a string so it can be handled correctly with scripting. 
 - [ ] Ensure that all examples in the `README.md` are working with easy to use modules. 
-- [ ] Use pymy or pyright to do static code checks. 
+- [ ] Make DAG like functionality to check if a inputs and outputs works for all model phases.
+- [ ] Use pymy, pyright or pyre to do static code checks. 
 - [ ] Decide: Add phase as an internal state and not in the forward pass:
   - Minor Pros: Tracing (to get onnx model) requires only torch.Tensors only as input - we avoid making an adapter class. 
   - Minor Cons: State gets hidden away - implicit instead of explicit.
   - Minor Pros: Similar to eval/training 
-
 - [ ] Collection of helper modules. Preprocessors, Backbones, Necks/Upsamplers, ImageClassification, SemanticSegmentation, ObjectDetection
   - [ ] All the modules in the README should be easy to import as actually modules.
   - [ ] Make common brick collections: BricksImageClassification, BricksSegmentation, BricksPointDetection, BricksObjectDetection

@@ -16,7 +16,7 @@ from utils_testing.lightning_module import LightningBrickCollection
 from torchbricks.bag_of_bricks import resnet_to_brick
 from torchbricks.bag_of_bricks import ImageClassifier, Preprocessor
 
-from torchbricks.bricks import BrickInterface, BrickCollection, BrickLoss, BrickNotTrainable, BrickTorchMetric, BrickTrainable
+from torchbricks.bricks import BrickInterface, BrickCollection, BrickLoss, BrickNotTrainable, BrickMetricCollection, BrickTrainable
 from torchbricks.custom_metrics import ConcatenatePredictionAndTarget
 
 def create_resnet_18(pretrained=False, num_classes=10):
@@ -47,7 +47,7 @@ def create_cifar_bricks(num_classes: int) -> Dict[str, BrickInterface]:
         'classifier': BrickTrainable(ImageClassifier(num_classes=num_classes, n_features=n_backbone_features),
                                      input_names=['features'], output_names=['logits', 'probabilities', 'class_prediction']),
         'loss_ce': BrickLoss(model=nn.CrossEntropyLoss(), input_names=['logits', 'targets'], output_names=['loss_ce']),
-        'metrics_classification': BrickTorchMetric(metric=metrics, input_names=['class_prediction', 'targets'],  metric_name=''),
+        'metrics_classification': BrickMetricCollection(metric_collection=metrics, input_names=['class_prediction', 'targets']),
         }
     return named_bricks
 

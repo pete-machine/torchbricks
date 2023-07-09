@@ -192,63 +192,70 @@ class BrickLoss(BrickModule):
                          trainable=True)
 
 
-class BrickTorchMetric(BrickInterface, nn.Module):
-    def __init__(self, metric: Union[MetricCollection, Metric],
+class BrickMetricCollection(BrickInterface, nn.Module):
+    def __init__(self, metric_collection: MetricCollection,
                  input_names: Union[List[str], Dict[str, str]],
-                 metric_name: Optional[str] = None,
                  run_on: Optional[List[Phase]] = None,
+                 return_metrics: bool = False,
                  ):
 
         super().__init__()
-        self.metric = metric
         self.input_names = input_names
+
+        if return_metrics:
+            output_names = list(metric_collection)
+        else:
+            output_names = []
+        self.output_names = output_names
         self.run_on = run_on or [Phase.TRAIN, Phase.TEST, Phase.VALIDATION]
-        self.metric_name = metric_name or ''
-        if self.metric_name == '' and isinstance(metric, Metric):
-            raise ValueError(f'Specify `metric_name` when using {Metric}.')
-        self.metrics_train = metric.clone()
-        self.metrics_validation = metric.clone()
-        self.metrics_test = metric.clone()
-
-    def _select_metric_collection_from_split(self, phase: Phase) -> MetricCollection:
-        if phase == Phase.TRAIN:
-            return self.metrics_train
-        elif phase == Phase.TEST:
-            return self.metrics_test
-        elif phase == Phase.VALIDATION:
-            return self.metrics_validation
-        raise TypeError('')
-
-    @staticmethod
-    def get_metric_name(phase: Phase, metric_name: str) -> str:
-        return f'{phase.value}/{metric_name}'
+        self.return_metrics = return_metrics
+        self.metrics = nn.ModuleDict({phase.name: metric_collection.clone() for phase in self.run_on})
 
     def forward(self, named_inputs: Union[List[str], Dict[str, str]], phase: Phase) -> Dict[str, Any]:
         skip_forward = phase not in self.run_on
         if skip_forward:
             return {}
 
-        return named_input_and_outputs_callable(callable=self.metric.update, named_inputs=named_inputs, input_names=self.input_names,
-                                                output_names=[], calculate_gradients=False)
+        metric_collection = self.metrics[phase.name]
+        if self.return_metrics:
+            output_names = ['metrics']
+            metric_callable = metric_collection  # Return metrics as a dictionary
+        else:
+            output_names = []
+            metric_callable = metric_collection.update  # Will not return metrics
+
+        output = named_input_and_outputs_callable(callable=metric_callable,
+                                                  named_inputs=named_inputs,
+                                                  input_names=self.input_names,
+                                                  output_names=output_names,
+                                                  calculate_gradients=False)
+        if self.return_metrics:
+            return output['metrics']  # Metrics in a dictionary
+        else:
+            assert output == {}
+            return {}
 
     def extract_losses(self, named_outputs: Dict[str, Any]) -> Dict[str, Any]:
         return {}
 
     def summarize(self, phase: Phase, reset: bool) -> Dict[str, Any]:
-        metric = self._select_metric_collection_from_split(phase=phase)
-        metrics = metric.compute()
+        metric_collection = self.metrics[phase.name]
+        metrics = metric_collection.compute()
         if reset:
-            metric.reset()
+            metric_collection.reset()
 
-        metric_name_prefix = self.get_metric_name(phase=phase, metric_name=self.metric_name)
-        if isinstance(metric, MetricCollection):
-            metrics = {f'{metric_name_prefix}{metric_name}': metric for metric_name, metric in metrics.items()}
-        elif isinstance(metric, Metric):
-            metrics = {metric_name_prefix: metrics}
-        else:
-            raise NameError()
         return metrics
 
+class BrickSingleMetric(BrickMetricCollection):
+    def __init__(self,
+                 metric: Metric,
+                 input_names: List[str] | Dict[str, str],
+                 metric_name: Optional[str],
+                 run_on: List[Phase] | None = None,
+                 return_metrics: bool = False):
+        metric_name = metric_name or metric.__class__.__name__
+        metric_collection = MetricCollection({metric_name: metric})
+        super().__init__(metric_collection=metric_collection, input_names=input_names, run_on=run_on, return_metrics=return_metrics)
 
 class OnnxExportAdaptor(nn.Module):
     def __init__(self, model: nn.Module, phase: Phase) -> None:

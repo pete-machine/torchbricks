@@ -1,9 +1,9 @@
 from pathlib import Path
 import pytest
 from torchbricks import bricks
-from torchbricks.bricks import BrickCollection, BrickLoss, BrickTorchMetric, Phase
+from torchbricks.bricks import BrickCollection, BrickLoss, BrickMetricCollection, Phase, BrickSingleMetric
 from torchbricks import custom_metrics
-from typing import Dict
+from typing import Dict, Optional
 import torch
 import onnx
 from torch import nn
@@ -52,17 +52,18 @@ def create_brick_collection(num_classes: int, num_backbone_featues: int) -> Dict
                                             input_names=['features'],
                                             output_names=['predictions']),
         'loss': bricks.BrickLoss(nn.CrossEntropyLoss(), input_names=['predictions', 'labels'], output_names=['ce_loss']),
-        'metrics': bricks.BrickTorchMetric(metric_collection, input_names=['predictions', 'labels'])
+        'metrics': bricks.BrickMetricCollection(metric_collection, input_names=['predictions', 'labels'])
     }
     return brick_collections
 
 
 def test_brick_collection():
     num_classes = 10
+    brick_collection = create_brick_collection(num_classes=num_classes, num_backbone_featues=5)
     expected_forward_named_outputs = {'labels', 'raw', 'phase', 'preprocessed', 'features', 'predictions'}
     expected_named_losses = {'ce_loss'}
-    expected_named_metrics = {'train/Accuracy', 'train/Concatenate', 'train/ConfMat', 'train/MeanAccuracy'}
-    brick_collection = create_brick_collection(num_classes=num_classes, num_backbone_featues=5)
+    expected_named_metrics = set(brick_collection['metrics'].metrics[Phase.TRAIN.name])
+
     model = bricks.BrickCollection(bricks=brick_collection)
     named_inputs = {'labels': torch.tensor(range(num_classes), dtype=torch.float64), 'raw': torch.zeros((3, 24, 24))}
 
@@ -82,7 +83,7 @@ def test_brick_collection_no_metrics():
     expected_named_metrics = {}
 
     brick_collection = create_brick_collection(num_classes=num_classes, num_backbone_featues=5)
-    brick_collection = {name: brick for name, brick in brick_collection.items() if not isinstance(brick, bricks.BrickTorchMetric)}
+    brick_collection = {name: brick for name, brick in brick_collection.items() if not isinstance(brick, bricks.BrickMetricCollection)}
     model = bricks.BrickCollection(bricks=brick_collection)
 
     named_inputs = {'labels': torch.tensor(range(num_classes), dtype=torch.float64), 'raw': torch.zeros((3, 24, 24))}
@@ -105,7 +106,7 @@ def test_brick_collection_no_metrics_no_losses():
     expected_named_metrics = {}
 
     brick_collection = create_brick_collection(num_classes=num_classes, num_backbone_featues=5)
-    brick_collection = {name: brick for name, brick in brick_collection.items() if not isinstance(brick, bricks.BrickTorchMetric)}
+    brick_collection = {name: brick for name, brick in brick_collection.items() if not isinstance(brick, bricks.BrickMetricCollection)}
     brick_collection = {name: brick for name, brick in brick_collection.items() if not isinstance(brick, bricks.BrickLoss)}
     model = bricks.BrickCollection(bricks=brick_collection)
 
@@ -184,13 +185,12 @@ def test_nested_bricks():
     assert_equal_dictionaries(outputs1, outputs2)
 
 
-def test_brick_torch_metric_single_metric():
+@pytest.mark.parametrize('metric_name', ('accuracy', None))
+def test_brick_torch_metric_single_metric(metric_name: Optional[str]):
     num_classes = 5
-    metric_name = 'Accuracy'
     bricks = {
-        'accuracy': BrickTorchMetric(MulticlassAccuracy(num_classes=num_classes),
-                                     input_names=['logits', 'targets'],
-                                     metric_name=metric_name),
+        'accuracy': BrickSingleMetric(MulticlassAccuracy(num_classes=num_classes), input_names=['logits', 'targets'],
+                                      metric_name=metric_name),
         'loss': BrickLoss(model=nn.CrossEntropyLoss(), input_names=['logits', 'targets'], output_names=['loss_ce'])
     }
 
@@ -200,18 +200,13 @@ def test_brick_torch_metric_single_metric():
     named_inputs = {'logits': batch_logits, 'targets': torch.ones((1), dtype=torch.int64)}
     model(phase=phase, named_inputs=named_inputs)
     metrics = model.summarize(phase=phase, reset=True)
+    expected_metric_name = metric_name or 'MulticlassAccuracy'
 
-    assert list(metrics) == [f'{phase.value}/{metric_name}']
-
-
-def test_brick_torch_metric_single_metric_assert():
-    metric_name = None
-    with pytest.raises(ValueError, match='Specify `metric_name` when using'):
-        BrickTorchMetric(MulticlassAccuracy(num_classes=10), input_names=['logits', 'targets'], metric_name=metric_name)
+    assert list(metrics) == [expected_metric_name]
 
 
-
-def test_brick_torch_metric_multiple_metric():
+@pytest.mark.parametrize('return_metrics', [False, True])
+def test_brick_torch_metric_multiple_metric(return_metrics: bool):
     num_classes = 5
     metric_collection = torchmetrics.MetricCollection({
         'MeanAccuracy': MulticlassAccuracy(num_classes=num_classes, average='macro'),
@@ -220,9 +215,8 @@ def test_brick_torch_metric_multiple_metric():
         'Concatenate': custom_metrics.ConcatenatePredictionAndTarget(compute_on_cpu=True)
     })
 
-    metric_name = None # None is allowed for metric collection.
     bricks = {
-        'metrics': BrickTorchMetric(metric_collection, input_names=['logits', 'targets'], metric_name=metric_name),
+        'metrics': BrickMetricCollection(metric_collection, input_names=['logits', 'targets'], return_metrics=return_metrics),
         'loss': BrickLoss(model=nn.CrossEntropyLoss(), input_names=['logits', 'targets'], output_names=['loss_ce'])
     }
 
@@ -230,10 +224,15 @@ def test_brick_torch_metric_multiple_metric():
     batch_logits = torch.rand((1, num_classes))
     phase = Phase.TRAIN
     named_inputs = {'logits': batch_logits, 'targets': torch.ones((1), dtype=torch.int64)}
-    model(named_inputs=named_inputs, phase=phase)
-    metrics = model.summarize(phase=phase, reset=True)
+    named_outputs = model(named_inputs=named_inputs, phase=phase)
 
-    expected_metrics = {f'{phase.value}/{name}' for name in metric_collection}
+    expected_outputs = {'logits', 'targets', 'phase', 'loss_ce'}
+    if return_metrics:
+        expected_outputs = expected_outputs.union(set(metric_collection))
+
+    assert set(named_outputs) == expected_outputs
+    metrics = model.summarize(phase=phase, reset=True)
+    expected_metrics = set(metric_collection)
     assert set(metrics) == expected_metrics
 
 def test_save_and_load_of_brick_collection(tmp_path: Path):
