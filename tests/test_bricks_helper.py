@@ -1,7 +1,9 @@
 
 from typing import Tuple
+
 import pytest
 from torchbricks.bricks_helper import named_input_and_outputs_callable
+
 
 def test_named_input_and_outputs_callable_single_in_single_out():
     def x2(value: float) -> float:

@@ -1,9 +1,11 @@
 import torch
-from torch import nn, Tensor
 import torch.nn.functional as F
-from torchvision.models import ResNet
+from torch import Tensor, nn
 from torchvision import transforms
+from torchvision.models import ResNet
+
 from torchbricks.bricks import BrickTrainable
+
 
 def resnet_to_brick(resnet: ResNet, input_name: str, output_name: str):
     """Function to convert a torchvision resnet model and convert it to a torch model"""

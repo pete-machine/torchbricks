@@ -295,10 +295,10 @@ def test_export_onnx_trace(tmp_path: Path):
         assert path_onnx.exists()
         onnx_model = onnx.load(path_onnx)
 
-        output_names_graph = set(output.name for output in onnx_model.graph.output)
+        output_names_graph = {output.name for output in onnx_model.graph.output}
         assert set(expected_outputs) == output_names_graph
 
-        input_names_graph = set(input.name for input in onnx_model.graph.input)
+        input_names_graph = {input.name for input in onnx_model.graph.input}
         assert set(expected_input) == input_names_graph
 
         onnx.checker.check_model(onnx_model)

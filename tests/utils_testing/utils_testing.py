@@ -1,8 +1,10 @@
 
 from pathlib import Path
 from typing import Dict
-from beartype import beartype
+
 import torch
+from beartype import beartype
+
 
 def path_repo_root():
     return Path(__file__).parents[2]

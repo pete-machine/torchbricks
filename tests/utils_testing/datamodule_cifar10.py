@@ -19,7 +19,7 @@ class CIFAR10DataModule(LightningDataModule):
         self.num_workers = num_workers
         self.dims = (3, 32, 32)
         self.num_classes = 10
-        self.label_names = list(str(number) for number in range(self.num_classes))
+        self.label_names = [str(number) for number in range(self.num_classes)]
 
     def get_data_class_info(self):
         return {'dims': self.dims, 'num_classes': self.num_classes, 'label_names': self.label_names}
