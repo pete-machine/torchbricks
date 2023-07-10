@@ -75,7 +75,7 @@ class BrickModule(nn.Module, BrickInterface):
                  alive_stages: Union[List[Stage], str] = 'all',
                  loss_output_names: Union[List[str], str] = 'none',
                  calculate_gradients: bool = True,
-                 trainable: Optional[bool] = None) -> None:
+                 trainable: bool = True) -> None:
         nn.Module.__init__(self)
         BrickInterface.__init__(self, input_names=input_names, output_names=output_names, alive_stages=alive_stages)
         self.model = model
@@ -86,7 +86,6 @@ class BrickModule(nn.Module, BrickInterface):
         else:
             self.calculate_gradients_on = []
 
-        trainable = trainable or True
         if not trainable and hasattr(model, 'requires_grad_'):
             self.model.requires_grad_(False)
 
@@ -275,6 +274,7 @@ class BrickMetricSingle(BrickMetricMultiple):
         metric_collection = MetricCollection({metric_name: metric})
         super().__init__(metric_collection=metric_collection, input_names=input_names, alive_stages=alive_stages,
                          return_metrics=return_metrics)
+
 
 class OnnxExportAdaptor(nn.Module):
     def __init__(self, model: nn.Module, stage: Stage) -> None:
