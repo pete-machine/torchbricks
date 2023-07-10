@@ -4,7 +4,7 @@ max-line-length = 140
 
 [tool.ruff]
 line-length = 140
-select = ["E", "F","B"]
+select = ["E", "F","B", "I", "W"]
 
 [project]
 name = "torchbricks"

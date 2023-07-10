@@ -71,7 +71,7 @@ We can now use torchbricks to define how the modules are connected
 
 ```python
 from torchbricks.bricks import BrickCollection, BrickNotTrainable, BrickTrainable
-from torchbricks.bricks import Phase
+from torchbricks.bricks import Stage
 
 # Defining model from bricks
 bricks = {
@@ -83,7 +83,7 @@ bricks = {
 # Executing model
 brick_collection = BrickCollection(bricks)
 batch_image_example = torch.rand((1, 3, 100, 200))
-outputs = brick_collection(named_inputs={'raw': batch_image_example}, phase=Phase.TRAIN)
+outputs = brick_collection(named_inputs={'raw': batch_image_example}, phase=Stage.TRAIN)
 print(outputs.keys())
 
 brick_collection
@@ -137,7 +137,7 @@ is passed to the forward function... But TorchBricks goes beyond that.
 An important feature of a brick collection is that is the `on_step`-function to also calculate metrics and losses.
 
 ```python
-from torchbricks.bricks import BrickLoss, BrickMetricCollection
+from torchbricks.bricks import BrickLoss, BrickMetricMultiple
 from torchmetrics.classification import MulticlassAccuracy
 
 bricks = {
@@ -145,7 +145,7 @@ bricks = {
     'backbone': resnet_brick,
     'image_classifier': BrickTrainable(ImageClassifier(num_classes=num_classes, n_features=resnet_brick.model.n_backbone_features),
                                      input_names=['features'], output_names=['logits', 'probabilities', 'class_prediction']),
-    'accuracy': BrickMetricCollection(MulticlassAccuracy(num_classes=num_classes), input_names=['class_prediction', 'targets'], 
+    'accuracy': BrickMetricMultiple(MulticlassAccuracy(num_classes=num_classes), input_names=['class_prediction', 'targets'], 
                                       metric_name="Accuracy"),
     'loss': BrickLoss(model=nn.CrossEntropyLoss(), input_names=['logits', 'targets'], output_names=['loss_ce'])
 }
@@ -153,14 +153,14 @@ bricks = {
 # We can still run the forward-pass as before - Note: The forward call does not require 'targets'
 brick_collection = BrickCollection(bricks)
 batch_image_example = torch.rand((1, 3, 100, 200))
-outputs = brick_collection(named_inputs={"raw": batch_image_example}, phase=Phase.TRAIN)
+outputs = brick_collection(named_inputs={"raw": batch_image_example}, phase=Stage.TRAIN)
 
 # Example of running `on_step`. Note: `on_step` requires `targets` to calculate metrics and loss.
 named_inputs = {"raw": batch_image_example, "targets": torch.ones((1), dtype=torch.int64)}
-named_outputs, losses = brick_collection.on_step(phase=Phase.TRAIN, named_inputs=named_inputs, batch_idx=0)
-named_outputs, losses = brick_collection.on_step(phase=Phase.TRAIN, named_inputs=named_inputs, batch_idx=1)
-named_outputs, losses = brick_collection.on_step(phase=Phase.TRAIN, named_inputs=named_inputs, batch_idx=2)
-metrics = brick_collection.summarize(phase=Phase.TRAIN, reset=True)
+named_outputs, losses = brick_collection.on_step(phase=Stage.TRAIN, named_inputs=named_inputs, batch_idx=0)
+named_outputs, losses = brick_collection.on_step(phase=Stage.TRAIN, named_inputs=named_inputs, batch_idx=1)
+named_outputs, losses = brick_collection.on_step(phase=Stage.TRAIN, named_inputs=named_inputs, batch_idx=2)
+metrics = brick_collection.summarize(phase=Stage.TRAIN, reset=True)
 print(f"{metrics=}, {losses=}")
 ```
 
@@ -251,7 +251,7 @@ else:
     # Executing model
     brick_collection = BrickCollection(bricks)
     batch_image_example = torch.rand((1, 3, 100, 200))
-    outputs = brick_collection(named_inputs={"raw": batch_image_example}, phase=Phase.TRAIN)
+    outputs = brick_collection(named_inputs={"raw": batch_image_example}, phase=Stage.TRAIN)
 
     print(outputs.keys())
 ```
@@ -296,7 +296,7 @@ MISSING
 - [x] Remove README.md header
 - [x] Make an export to onnx function 
 - [x] Make it optional if gradients can be passed through NonTrainableBrick without weights being optimized
-- [ ] Refactor MetricCollection to have flag to return metrics.
+- [x] Refactor Metrics: Create BrickMetricCollection and BrickSingleMetric and create flag to return metrics.
 - [ ] Update README.md to match the new bricks. 
   - [ ] Start with basic bricks example. 
   - [ ] Use loss-function to show that Phase decided on what is being executed. 

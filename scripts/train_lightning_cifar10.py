@@ -2,22 +2,21 @@ import argparse
 from datetime import datetime
 from pathlib import Path
 from typing import Dict
-from pytorch_lightning.loggers import WandbLogger
-from pytorch_lightning import Trainer
+
 import torch
+import torchmetrics
+import torchvision
+from pytorch_lightning import Trainer
+from pytorch_lightning.loggers import WandbLogger
 from torch import nn
 from torch.optim.lr_scheduler import OneCycleLR
-import torchmetrics
+from torchbricks.bag_of_bricks import ImageClassifier, Preprocessor, resnet_to_brick
+from torchbricks.bricks import BrickCollection, BrickInterface, BrickLoss, BrickMetricMultiple, BrickNotTrainable, BrickTrainable
+from torchbricks.custom_metrics import ConcatenatePredictionAndTarget
 from torchmetrics import classification
-import torchvision
-
 from utils_testing.datamodule_cifar10 import CIFAR10DataModule
 from utils_testing.lightning_module import LightningBrickCollection
-from torchbricks.bag_of_bricks import resnet_to_brick
-from torchbricks.bag_of_bricks import ImageClassifier, Preprocessor
 
-from torchbricks.bricks import BrickInterface, BrickCollection, BrickLoss, BrickNotTrainable, BrickMetricCollection, BrickTrainable
-from torchbricks.custom_metrics import ConcatenatePredictionAndTarget
 
 def create_resnet_18(pretrained=False, num_classes=10):
     model = torchvision.models.resnet18(pretrained=pretrained, num_classes=num_classes)
@@ -47,7 +46,7 @@ def create_cifar_bricks(num_classes: int) -> Dict[str, BrickInterface]:
         'classifier': BrickTrainable(ImageClassifier(num_classes=num_classes, n_features=n_backbone_features),
                                      input_names=['features'], output_names=['logits', 'probabilities', 'class_prediction']),
         'loss_ce': BrickLoss(model=nn.CrossEntropyLoss(), input_names=['logits', 'targets'], output_names=['loss_ce']),
-        'metrics_classification': BrickMetricCollection(metric_collection=metrics, input_names=['class_prediction', 'targets']),
+        'metrics_classification': BrickMetricMultiple(metric_collection=metrics, input_names=['class_prediction', 'targets']),
         }
     return named_bricks
 
