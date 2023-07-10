@@ -212,11 +212,14 @@ class BrickLoss(BrickModule):
 
 
 class BrickMetricMultiple(BrickModule):
-    def __init__(self, metric_collection: MetricCollection,
+    def __init__(self, metric_collection: Union[MetricCollection,  Dict[str, Metric]],
                  input_names: Union[List[str], Dict[str, str]],
                  alive_stages: Optional[List[Stage]] = None,
                  return_metrics: bool = False,
                  ):
+
+        if isinstance(metric_collection, dict):
+            metric_collection = MetricCollection(metric_collection)
         alive_stages = alive_stages or [Stage.TRAIN, Stage.TEST, Stage.VALIDATION]
         if return_metrics:
             output_names = list(metric_collection)
@@ -267,12 +270,11 @@ class BrickMetricSingle(BrickMetricMultiple):
     def __init__(self,
                  metric: Metric,
                  input_names: List[str] | Dict[str, str],
-                 metric_name: Optional[str],
+                 metric_name: Optional[str] = None,
                  alive_stages: List[Stage] | None = None,
                  return_metrics: bool = False):
         metric_name = metric_name or metric.__class__.__name__
-        metric_collection = MetricCollection({metric_name: metric})
-        super().__init__(metric_collection=metric_collection, input_names=input_names, alive_stages=alive_stages,
+        super().__init__(metric_collection={metric_name: metric}, input_names=input_names, alive_stages=alive_stages,
                          return_metrics=return_metrics)
 
 

@@ -197,7 +197,7 @@ def test_brick_torch_metric_single_metric(metric_name: Optional[str]):
     batch_logits = torch.rand((1, num_classes))
     stage = Stage.TRAIN
     named_inputs = {'logits': batch_logits, 'targets': torch.ones((1), dtype=torch.int64)}
-    model(stage=stage, named_inputs=named_inputs)
+    model(named_inputs=named_inputs, stage=stage)
     metrics = model.summarize(stage=stage, reset=True)
     expected_metric_name = metric_name or 'MulticlassAccuracy'
 

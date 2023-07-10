@@ -18,8 +18,8 @@ from utils_testing.datamodule_cifar10 import CIFAR10DataModule
 from utils_testing.lightning_module import LightningBrickCollection
 
 
-def create_resnet_18(pretrained=False, num_classes=10):
-    model = torchvision.models.resnet18(pretrained=pretrained, num_classes=num_classes)
+def create_resnet_18(weights=None, num_classes=10):
+    model = torchvision.models.resnet18(weights=weights, num_classes=num_classes)
     model.conv1 = nn.Conv2d(3, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
     model.maxpool = nn.Identity()
     return model
@@ -29,9 +29,7 @@ def create_cifar_bricks(num_classes: int) -> Dict[str, BrickInterface]:
 
     named_bricks = {
         'preprocessor': BrickNotTrainable(Preprocessor(), input_names=['raw'], output_names=['normalized']),
-        'backbone': resnet_to_brick(resnet=create_resnet_18(num_classes=num_classes),
-                                                     input_name='normalized',
-                                                     output_name='features'),
+        'backbone': resnet_to_brick(resnet=create_resnet_18(num_classes=num_classes), input_name='normalized', output_name='features'),
     }
 
     n_backbone_features = named_bricks['backbone'].model.n_backbone_features
