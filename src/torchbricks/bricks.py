@@ -22,15 +22,15 @@ class BrickInterface(ABC):
     def __init__(self,
                  input_names: Union[List[str], Dict[str, str], str],
                  output_names: List[str],
-                 run_stages: Union[List[Stage], str] = 'all',
+                 alive_stages: Union[List[Stage], str] = 'all',
                  ) -> None:
         super().__init__()
         self.input_names = input_names
         self.output_names = output_names
-        self.run_stages: List[Stage] = parse_argument_run_on(run_stages)
+        self.alive_stages: List[Stage] = parse_argument_alive_stages(alive_stages)
 
     def run_now(self, stage: Stage) -> bool:
-        return stage in self.run_stages
+        return stage in self.alive_stages
 
     @abstractmethod
     def forward(self, named_inputs: Dict[str, Any], stage: Stage) -> Dict[str, Any]:
@@ -45,15 +45,15 @@ class BrickInterface(ABC):
         """"""
 
 
-def parse_argument_run_on(run_on: Union[List[Stage], str]) -> List[Stage]:
+def parse_argument_alive_stages(alive_stages: Union[List[Stage], str]) -> List[Stage]:
     available_stages = list(Stage)
-    if run_on == 'all':
-        run_on = available_stages
-    elif run_on == 'none':
-        run_on = []
+    if alive_stages == 'all':
+        alive_stages = available_stages
+    elif alive_stages == 'none':
+        alive_stages = []
 
-    assert isinstance(run_on, List), f'"run_on" should be "all", "none" or List[stages]. It is {run_on=}'
-    return run_on
+    assert isinstance(alive_stages, List), f'"alive_stages" should be "all", "none" or List[stages]. It is {alive_stages=}'
+    return alive_stages
 
 
 def parse_argument_loss_output_names(loss_output_names: Union[List[str], str], available_output_names: List[str]) -> List[str]:
@@ -72,12 +72,12 @@ class BrickModule(nn.Module, BrickInterface):
     def __init__(self, model: nn.Module,
                  input_names: Union[List[str], Dict[str, str], str],
                  output_names: List[str],
-                 run_on: Union[List[Stage], str] = 'all',
+                 alive_stages: Union[List[Stage], str] = 'all',
                  loss_output_names: Union[List[str], str] = 'none',
                  calculate_gradients: bool = True,
                  trainable: Optional[bool] = None) -> None:
         nn.Module.__init__(self)
-        BrickInterface.__init__(self, input_names=input_names, output_names=output_names, run_stages=run_on)
+        BrickInterface.__init__(self, input_names=input_names, output_names=output_names, alive_stages=alive_stages)
         self.model = model
         self.loss_output_names = parse_argument_loss_output_names(loss_output_names, available_output_names=output_names)
 
@@ -129,7 +129,7 @@ class BrickCollection(nn.ModuleDict):  # Note BrickCollection is inherently Modu
                 gathered_named_io.update(results)
 
         if not return_inputs:
-            [gathered_named_io.pop(name_input) for name_input in ['stage'] + list(named_inputs)]
+            [gathered_named_io.pop(name_input) for name_input in ['stage', *list(named_inputs)]]
         return gathered_named_io
 
     def run_now(self, stage: Stage) -> bool:
@@ -167,13 +167,13 @@ class BrickTrainable(BrickModule):
                  input_names: Union[List[str], Dict[str, str]],
                  output_names: List[str],
                  loss_output_names: Union[List[str], str] = 'none',
-                 run_on: Optional[List[Stage]] = None):
-        run_on = run_on or list(Stage)  # Runs on all stages
+                 alive_stages: Optional[List[Stage]] = None):
+        alive_stages = alive_stages or list(Stage)  # Runs on all stages
         super().__init__(model=model,
                          input_names=input_names,
                          output_names=output_names,
                          loss_output_names=loss_output_names,
-                         run_on=run_on,
+                         alive_stages=alive_stages,
                          calculate_gradients=True,
                          trainable=True)
 
@@ -182,14 +182,14 @@ class BrickNotTrainable(BrickModule):
     def __init__(self, model: nn.Module,
                  input_names: Union[List[str], Dict[str, str]],
                  output_names: List[str],
-                 run_on: Optional[List[Stage]] = None,
+                 alive_stages: Optional[List[Stage]] = None,
                  calculate_gradients: bool = True):
-        run_on = run_on or list(Stage)  # Runs on all stages
+        alive_stages = alive_stages or list(Stage)  # Runs on all stages
         super().__init__(model=model,
                          input_names=input_names,
                          output_names=output_names,
                          loss_output_names='none',
-                         run_on=run_on,
+                         alive_stages=alive_stages,
                          calculate_gradients=calculate_gradients,
                          trainable=False)
 
@@ -199,15 +199,15 @@ class BrickLoss(BrickModule):
                  input_names: Union[List[str], Dict[str, str]],
                  output_names: List[str],
                  loss_output_names: Union[List[str], str] = 'all',
-                 run_on: Optional[List[Stage]] = None,
+                 alive_stages: Optional[List[Stage]] = None,
                  ):
 
-        run_on = run_on or [Stage.TRAIN, Stage.TEST, Stage.VALIDATION]
+        alive_stages = alive_stages or [Stage.TRAIN, Stage.TEST, Stage.VALIDATION]
         super().__init__(model=model,
                          input_names=input_names,
                          output_names=output_names,
                          loss_output_names=loss_output_names,
-                         run_on=run_on,
+                         alive_stages=alive_stages,
                          calculate_gradients=True,
                          trainable=True)
 
@@ -215,22 +215,22 @@ class BrickLoss(BrickModule):
 class BrickMetricMultiple(BrickModule):
     def __init__(self, metric_collection: MetricCollection,
                  input_names: Union[List[str], Dict[str, str]],
-                 run_on: Optional[List[Stage]] = None,
+                 alive_stages: Optional[List[Stage]] = None,
                  return_metrics: bool = False,
                  ):
-        run_on = run_on or [Stage.TRAIN, Stage.TEST, Stage.VALIDATION]
+        alive_stages = alive_stages or [Stage.TRAIN, Stage.TEST, Stage.VALIDATION]
         if return_metrics:
             output_names = list(metric_collection)
         else:
             output_names = []
         self.return_metrics = return_metrics
-        metrics = nn.ModuleDict({stage.name: metric_collection.clone() for stage in run_on})
-        super().__init__(model=metrics, input_names=input_names, output_names=output_names, run_on=run_on,
+        metrics = nn.ModuleDict({stage.name: metric_collection.clone() for stage in alive_stages})
+        super().__init__(model=metrics, input_names=input_names, output_names=output_names, alive_stages=alive_stages,
                          trainable=False,
                          calculate_gradients=False)
 
     def forward(self, named_inputs: Union[List[str], Dict[str, str]], stage: Stage) -> Dict[str, Any]:
-        skip_forward = stage not in self.run_stages
+        skip_forward = stage not in self.alive_stages
         if skip_forward:
             return {}
 
@@ -269,11 +269,12 @@ class BrickMetricSingle(BrickMetricMultiple):
                  metric: Metric,
                  input_names: List[str] | Dict[str, str],
                  metric_name: Optional[str],
-                 run_on: List[Stage] | None = None,
+                 alive_stages: List[Stage] | None = None,
                  return_metrics: bool = False):
         metric_name = metric_name or metric.__class__.__name__
         metric_collection = MetricCollection({metric_name: metric})
-        super().__init__(metric_collection=metric_collection, input_names=input_names, run_on=run_on, return_metrics=return_metrics)
+        super().__init__(metric_collection=metric_collection, input_names=input_names, alive_stages=alive_stages,
+                         return_metrics=return_metrics)
 
 class OnnxExportAdaptor(nn.Module):
     def __init__(self, model: nn.Module, stage: Stage) -> None:

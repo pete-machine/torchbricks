@@ -302,7 +302,7 @@ MISSING
   - [ ] Use loss-function to show that Phase decided on what is being executed. 
   - [ ] Introduce metrics by it-self in another example
 - [ ] Add onnx export example to the README.md
-- [ ] Make brick base class with input_names, output_names and run_on - inherit this from other bricks. 
+- [ ] Make brick base class with input_names, output_names and alive_stages - inherit this from other bricks. 
   - [ ] Pros: We might include other non-torch modules later. 
   - [ ] Do not necessarily pass a Phase-object. Consider also passing it as a string so it can be handled correctly with scripting. 
 - [ ] Ensure that all examples in the `README.md` are working with easy to use modules. 
