@@ -73,14 +73,13 @@ class ClassifierDummy(nn.Module):
 Using input and output names, we specify how modules are connected.
 
 ```python
-from torchbricks.bricks import BrickCollection, BrickModule
+from torchbricks.bricks import BrickCollection, BrickTrainable, BrickNotTrainable, BrickLoss
 from torchbricks.bricks import Stage
 
-# Defining model from bricks
 bricks = {
-    'preprocessor': BrickModule(PreprocessorDummy(), input_names=['raw'], output_names=['processed']),
-    'backbone': BrickModule(TinyModel(n_channels=3, n_features=10), input_names=['processed'], output_names=['embedding']),
-    'head': BrickModule(ClassifierDummy(num_classes=3, in_features=10), input_names=['embedding'], output_names=['logits', "softmaxed"]),
+    'preprocessor': BrickNotTrainable(PreprocessorDummy(), input_names=['raw'], output_names=['processed']),
+    'backbone': BrickTrainable(TinyModel(n_channels=3, n_features=10), input_names=['processed'], output_names=['embedding']),
+    'head': BrickTrainable(ClassifierDummy(num_classes=3, in_features=10), input_names=['embedding'], output_names=['logits', "softmaxed"]),
 }
 ```
 
@@ -88,7 +87,9 @@ All modules are added as entries in a regular dictionary and for each module, we
 input and output names. The number of input and output names should match the actually number of input and output names 
 for each function. 
 
-The `preprocessor` uses a `raw` input tensor and passed to the `processed` tensor to the `backbone`. The backbone returns 
+Each model is wrapped inside a brick either `BrickTrainable` and `BrickNotTrainable`.
+
+The `preprocessor` uses a `raw` input tensor and passes the `processed` tensor to the `backbone`. The backbone returns 
 the `embedding` tensor and passes it to the `head` determining both `logits` and `softmaxed` tensors. 
 
 Bricks are then passed to a `BrickCollection` for executing bricks. The brick collection accepts a dictionary with required inputs and
@@ -97,7 +98,7 @@ returns a dictionary with both intermediated and resulting tensors.
 ```python
 brick_collection = BrickCollection(bricks)
 batch_images = torch.rand((2, 3, 100, 200))
-named_outputs = brick_collection(named_inputs={'raw': batch_images}, stage=Stage.TRAIN)
+named_outputs = brick_collection(named_inputs={'raw': batch_images}, stage=Stage.INFERENCE)
 print(named_outputs.keys())
 ```
 
@@ -112,7 +113,7 @@ collection and build completely new models from reusable parts.
 - A brick collection is actually a dictionary (`nn.DictModule`). Allowing you to access, pop and update the 
   collection easily as a regular dictionary. It can to handle nested dictionary, allowing groups of bricks to be added/removed easily. 
 
-Note also that we set `stage=stage.TRAIN` to explicitly specify if we are doing training, validation, test or inference.
+Note also that we set `stage=Stage.INFERENCE` to explicitly specify if we are doing training, validation, test or inference.
 Specifying a stage is important, if we want a module to act in a specific way during specific stages.
 We will get back to this in the next section.
 
@@ -122,48 +123,53 @@ We will get back to this in the next section.
 The second concept is to specify when bricks are alive - meaning we specify at which stages (train, test, validation, inference and export) 
 a brick is executed. For other stage the brick will play dead - do nothing / return empty dictionary. 
 
-In above example this is not particular interesting - because preprocessor, backbone model and head would typically by alive in all stages. 
+Meaning that for different `stages` of the model, we will have the option of creating a unique DAG for each model stage. 
 
-So we will demonstrate by adding a loss function and specifying `alive_stages` for each brick.
+In above example this is not particular interesting - because preprocessor, backbone model and head would typically be alive in all stages. 
+
+So we will demonstrate by adding a loss brick (`BrickLoss`) and specifying `alive_stages` for each brick.
 
 ```python
 bricks = {
-    'preprocessor': BrickModule(PreprocessorDummy(), input_names=['raw'], output_names=['processed'], alive_stages="all"),
-    'backbone': BrickModule(TinyModel(n_channels=3, n_features=10), input_names=['processed'], output_names=['embedding'], alive_stages="all"),
-    'head': BrickModule(ClassifierDummy(num_classes=3, in_features=10), input_names=['embedding'], output_names=['logits', 'softmaxed'], 
+    'preprocessor': BrickNotTrainable(PreprocessorDummy(), input_names=['raw'], output_names=['processed'], alive_stages="all"),
+    'backbone': BrickTrainable(TinyModel(n_channels=3, n_features=10), input_names=['processed'], output_names=['embedding'], alive_stages="all"),
+    'head': BrickTrainable(ClassifierDummy(num_classes=3, in_features=10), input_names=['embedding'], output_names=['logits', 'softmaxed'], 
                                     alive_stages="all"),
-    'loss': BrickModule(model=nn.CrossEntropyLoss(), input_names=['logits', 'targets'], output_names=['loss_ce'], 
-                        alive_stages=[Stage.TRAIN, Stage.VALIDATION, Stage.TEST], loss_output_names="all")
+    'loss': BrickLoss(model=nn.CrossEntropyLoss(), input_names=['logits', 'targets'], output_names=['loss_ce'], 
+                      alive_stages=[Stage.TRAIN, Stage.VALIDATION, Stage.TEST], loss_output_names="all")
 }
 ```
 
+<!-- #region -->
 We set `preprocessor`, `backbone` and `head` to be alive on all stages `alive_stages="all"` - this is the default behavior and
 similar to before. 
 
-For `loss` we set `alive_stages=[Stage.TRAIN, Stage.VALIDATION, Stage.TEST]`. 
+For `loss` we set `alive_stages=[Stage.TRAIN, Stage.VALIDATION, Stage.TEST]` to calculate loss during train, validation and test
+stages. 
 
-Also note that the `loss` brick requires an additional input called `targets`.
+Another advantages is that model have different input requirements for different stages.
+
+For `Stage.INFERENCE` and `Stage.EXPROT` stages, the model only requires the `raw` tensor as input. 
+
+While for `Stage.TRAIN`, `Stage.VALIDATION` and `Stage.TEST` stages, the model requires both `raw` and `targets` input tensors.
+
 
 ```python
-brick_collection = BrickCollection(bricks)
-batch_images = torch.rand((1, 3, 100, 200))
-outputs_without_loss = brick_collection(named_inputs={'raw': batch_images}, stage=Stage.INFERENCE)
-outputs_with_loss = brick_collection(named_inputs={'raw': batch_images, "targets": torch.ones((1,3))}, stage=Stage.TRAIN)
+    named_outputs_without_loss = brick_collection(named_inputs={'raw': batch_images}, stage=Stage.INFERENCE)
+    named_outputs_with_loss = brick_collection(named_inputs={'raw': batch_images, "targets": torch.ones((1,3))}, stage=Stage.TRAIN)
 ```
+<!-- #endregion -->
 
-In above example, we execute `brick_collection` with both `Stage.INFERENCE` and `Stage.INFERENCE`.
-With `stage=Stage.INFERENCE`, it will act as before - the loss-module will not be executed and `targets` will not be required. 
+## Bricks for model training
+We are not creating a training framework, but to easily use the brick collection in your favorite training framework or custom training 
+loop, we need the final piece. We should be able to calculate and gather metrics across a whole dataset. 
 
-With `stage=Stage.TRAIN`, we should also provide `targets` and losses are also returned.
-
-
-## Concept 1 and 2 in a "real" use case
-We now want to demonstrate bricks in a "real" use case. 
+We will extend our example from before by adding metric bricks and using reusable components from `torchbricks.bag_of_bricks`.
 
 ```python
 import torchvision
 from torchbricks.bag_of_bricks import ImageClassifier, Preprocessor, resnet_to_brick
-from torchbricks.bricks import BrickLoss, BrickNotTrainable, BrickTrainable, BrickMetricSingle
+from torchbricks.bricks import BrickMetricSingle
 from torchmetrics.classification import MulticlassAccuracy
 
 num_classes = 10
@@ -180,7 +186,7 @@ bricks = {
 }
 
 brick_collection = BrickCollection(bricks)
-named_inputs = {"raw": batch_images, "targets": torch.ones((1), dtype=torch.int64)}
+named_inputs = {"raw": batch_images, "targets": torch.ones((2), dtype=torch.int64)}
 named_outputs = brick_collection(named_inputs=named_inputs, stage=Stage.TRAIN)
 named_outputs = brick_collection(named_inputs=named_inputs, stage=Stage.TRAIN)
 named_outputs = brick_collection(named_inputs=named_inputs, stage=Stage.TRAIN)
@@ -190,17 +196,16 @@ print(f"{metrics=}, {named_outputs.keys()=}")
 ```
 
 
-In this example we do not use `BrickModule` to build our collection - you can do that -
-but instead we recommend using our pre-configured brick modules (`BrickLoss`, `BrickNotTrainable`, `BrickTrainable`, 
-`BrickMetricSingle` and `BrickCollection`) to both ensure sensible defaults and to show the intend of each brick. 
-
 For metrics, we rely on the [TorchMetrics](https://torchmetrics.readthedocs.io/en/stable/) library and passes either a single 
-metric (`torchmetrics.Metric`) to `BrickMetricSingle` or a collection of metrics (`torchmetrics.MetricCollection`) to `BrickMetricMultiple`.
+metric (`torchmetrics.Metric`) to `BrickMetricSingle` or a collection of metrics (`torchmetrics.MetricCollection`) to `BrickMetrics`.
 
-For multiple metrics use always `BrickMetricMultiple` with `torchmetrics.MetricCollection`. 
+For multiple metrics, use always `BrickMetrics` with `torchmetrics.MetricCollection`. 
 
 On each `forward`, we calculate model outputs, losses and metrics for each batch. Metrics are aggregated internally in `BrickMetricSingle` 
 and only returned with the `summarize`-call. We set `reset=True` to reset metric aggregation. 
+
+Note also that metrics are not passed to other bricks - they are only stored internally. To also pass metrics to other bricks
+you can set `return_metrics=True` for `BrickMetrics` and `BrickMetricSingle`.
 
 
 ### Bag of bricks - reusable bricks modules
@@ -234,7 +239,16 @@ Missing sections:
 - [ ] Acts as a nn.Module
 - [ ] Acts as a dictionary - Nested brick collection
 - [ ] Export as ONNX
-- [ ] Pytorch lightning
+- [ ] Training with Pytorch lightning
+- [ ] Pass all inputs as a dictionary `input_names='all'`
+- [ ] Using stage inside module
+- [ ] the `extract_losses` function
+- [ ] Bag of bricks - reusable bricks modules
+  - [ ] Note also in above example we use bag-of-bricks to import commonly used `nn.Module`s. This includes a `Preprocessor`, `ImageClassifier` and `resnet_to_brick` to convert torchvision resnet models into a backbone brick  (without a classifier).
+- [ ] The default `BrickModule`
+- [ ] In this example we do not use `BrickModule` to build our collection - you can do that -
+but instead we recommend using our pre-configured brick modules (`BrickLoss`, `BrickNotTrainable`, `BrickTrainable`, 
+`BrickMetricSingle` and `BrickCollection`) to both ensure sensible defaults and to show the intend of each brick. 
 
 
 ## Use-case: Training with a collections of bricks
@@ -329,10 +343,10 @@ MISSING
   - [x] Use loss-function to show that stage decided on what is being executed. 
   - [x] Introduce metrics by it-self in another example
 - [x] Ensure that all examples in the `README.md` are working with easy to use modules. 
+- [x] Add typeguard
 - [ ] Add onnx export example to the README.md
 - [ ] Make DAG like functionality to check if a inputs and outputs works for all model stages.
 - [ ] Use pymy, pyright or pyre to do static code checks. 
-- [ ] Add typeguard
 - [ ] Decide: Add stage as an internal state and not in the forward pass:
   - Minor Pros: Tracing (to get onnx model) requires only torch.Tensors only as input - we avoid making an adapter class. 
   - Minor Cons: State gets hidden away - implicit instead of explicit.

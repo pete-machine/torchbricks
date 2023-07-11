@@ -30,8 +30,8 @@ update-lock-file:        ## Update lock file using the specification in 'environ
 .PHONY: update
 update: update-lock-file install ## Update lock file using the specification in 'environment.yml'
 
-.PHONY: test
-test:        	         ## Run tests and generate coverage report.
+.PHONY: test-all
+test-all:        	         ## Run tests and generate coverage report.
 	@set -e
 	$(PYTHONPATH) pytest -v --cov-config .coveragerc --cov=src -l --tb=short --maxfail=1 --durations=0 tests/
 	coverage xml
@@ -39,7 +39,7 @@ test:        	         ## Run tests and generate coverage report.
 
 
 .PHONY: test
-test-quick:
+test:
 	$(PYTHONPATH) pytest --durations=0 -m "not slow" tests/
 
 .PHONY: train-cifar10

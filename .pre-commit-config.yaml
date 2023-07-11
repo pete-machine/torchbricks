@@ -32,6 +32,7 @@ repos:
     - id: clear-notebook
       name: Clear outputs of README notebook
       entry: jupyter nbconvert --clear-output --inplace
+      # entry: jupyter nbconvert --execute --inplace
       language: system
       files: README.ipynb
 
@@ -41,10 +42,4 @@ repos:
     - id: jupytext
       files: README.ipynb
       args: [--from, ipynb, --to, markdown, --opt, hide_notebook_metadata=True]
-
-
-#     - id: create-markdown-from-readme
-#       name: Make markdown readme file
-#       entry: jupyter nbconvert --to markdown
-#       language: system
-#       files: README.ipynb
+      # additional_dependencies: [nbconvert, ipykernel]

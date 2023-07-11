@@ -11,7 +11,7 @@ from pytorch_lightning.loggers import WandbLogger
 from torch import nn
 from torch.optim.lr_scheduler import OneCycleLR
 from torchbricks.bag_of_bricks import ImageClassifier, Preprocessor, resnet_to_brick
-from torchbricks.bricks import BrickCollection, BrickInterface, BrickLoss, BrickMetricMultiple, BrickNotTrainable, BrickTrainable
+from torchbricks.bricks import BrickCollection, BrickInterface, BrickLoss, BrickMetrics, BrickNotTrainable, BrickTrainable
 from torchbricks.custom_metrics import ConcatenatePredictionAndTarget
 from torchmetrics import classification
 from utils_testing.datamodule_cifar10 import CIFAR10DataModule
@@ -44,7 +44,7 @@ def create_cifar_bricks(num_classes: int) -> Dict[str, BrickInterface]:
         'classifier': BrickTrainable(ImageClassifier(num_classes=num_classes, n_features=n_backbone_features),
                                      input_names=['features'], output_names=['logits', 'probabilities', 'class_prediction']),
         'loss_ce': BrickLoss(model=nn.CrossEntropyLoss(), input_names=['logits', 'targets'], output_names=['loss_ce']),
-        'metrics_classification': BrickMetricMultiple(metric_collection=metrics, input_names=['class_prediction', 'targets']),
+        'metrics_classification': BrickMetrics(metric_collection=metrics, input_names=['class_prediction', 'targets']),
         }
     return named_bricks
 

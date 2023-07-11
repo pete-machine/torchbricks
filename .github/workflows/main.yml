@@ -33,7 +33,7 @@ jobs:
         run: make lint
         shell: micromamba-shell {0}
       - name: Run tests
-        run: make test
+        run: make test-all
         shell: micromamba-shell {0}
       - name: "Upload coverage to Codecov"
         uses: codecov/codecov-action@v3

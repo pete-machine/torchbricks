@@ -7,7 +7,7 @@ import torch
 import torchmetrics
 from torch import nn
 from torchbricks import bricks, custom_metrics
-from torchbricks.bricks import BrickCollection, BrickLoss, BrickMetricMultiple, BrickMetricSingle, Stage, export_as_onnx
+from torchbricks.bricks import BrickCollection, BrickLoss, BrickMetrics, BrickMetricSingle, Stage, export_as_onnx
 from torchmetrics.classification import MulticlassAccuracy
 from utils_testing.utils_testing import assert_equal_dictionaries
 
@@ -51,7 +51,7 @@ def create_brick_collection(num_classes: int, num_backbone_featues: int) -> Dict
                                             input_names=['features'],
                                             output_names=['predictions']),
         'loss': bricks.BrickLoss(nn.CrossEntropyLoss(), input_names=['predictions', 'labels'], output_names=['ce_loss']),
-        'metrics': bricks.BrickMetricMultiple(metric_collection, input_names=['predictions', 'labels'])
+        'metrics': bricks.BrickMetrics(metric_collection, input_names=['predictions', 'labels'])
     }
     return brick_collections
 
@@ -82,7 +82,7 @@ def test_brick_collection_no_metrics():
     expected_named_metrics = {}
 
     brick_collection = create_brick_collection(num_classes=num_classes, num_backbone_featues=5)
-    brick_collection = {name: brick for name, brick in brick_collection.items() if not isinstance(brick, bricks.BrickMetricMultiple)}
+    brick_collection = {name: brick for name, brick in brick_collection.items() if not isinstance(brick, bricks.BrickMetrics)}
     model = bricks.BrickCollection(bricks=brick_collection)
 
     named_inputs = {'labels': torch.tensor(range(num_classes), dtype=torch.float64), 'raw': torch.zeros((3, 24, 24))}
@@ -105,7 +105,7 @@ def test_brick_collection_no_metrics_no_losses():
     expected_named_metrics = {}
 
     brick_collection = create_brick_collection(num_classes=num_classes, num_backbone_featues=5)
-    brick_collection = {name: brick for name, brick in brick_collection.items() if not isinstance(brick, bricks.BrickMetricMultiple)}
+    brick_collection = {name: brick for name, brick in brick_collection.items() if not isinstance(brick, bricks.BrickMetrics)}
     brick_collection = {name: brick for name, brick in brick_collection.items() if not isinstance(brick, bricks.BrickLoss)}
     model = bricks.BrickCollection(bricks=brick_collection)
 
@@ -215,7 +215,7 @@ def test_brick_torch_metric_multiple_metric(return_metrics: bool):
     })
 
     bricks = {
-        'metrics': BrickMetricMultiple(metric_collection, input_names=['logits', 'targets'], return_metrics=return_metrics),
+        'metrics': BrickMetrics(metric_collection, input_names=['logits', 'targets'], return_metrics=return_metrics),
         'loss': BrickLoss(model=nn.CrossEntropyLoss(), input_names=['logits', 'targets'], output_names=['loss_ce'])
     }
 
@@ -302,30 +302,3 @@ def test_export_onnx_trace(tmp_path: Path):
         assert set(expected_input) == input_names_graph
 
         onnx.checker.check_model(onnx_model)
-
-
-# def test_export_jit_script():
-#     num_classes = 3
-#     brick_collection = create_brick_collection(num_classes=num_classes, num_backbone_featues=10)
-#     model = BrickCollection(brick_collection)
-#     # named_inputs = {"named_inputs": {'raw': torch.zeros((3, 24, 24))}, "stage": stage.INFERENCE}
-#     named_inputs = {'raw': torch.zeros((3, 24, 24))}
-#     # model_scripted = torch.jit.script(model)  # Export to TorchScript
-#     # model_scripted.save('model_scripted.pt')  # Save
-
-#     kwargs = {"named_inputs": named_inputs, "stage": stage.INFERENCE}
-#     outputs = model(**kwargs)
-
-#     class OnnxExportable(nn.Module):
-#         def __init__(self, model: nn.Module, stage: stage) -> None:
-#             super().__init__()
-#             self.model = model
-#             self.stage = stage
-
-#         def forward(self, named_inputs):
-#             return self.model.forward(named_inputs=named_inputs, stage=self.stage)
-#     onnx_exportable = OnnxExportable(model=model, stage=stage.INFERENCE)
-#     torch.onnx.export(model=onnx_exportable, args=tuple(named_inputs.values()),
-#                       f="model.onnx", verbose=True,
-#                       input_names=list(named_inputs),
-#                       output_names=list(outputs))
