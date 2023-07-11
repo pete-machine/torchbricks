@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, List, Tuple, Union
+from typing import Any, Callable, Dict, List, Union
 
 import torch
 from typeguard import typechecked
@@ -27,7 +27,7 @@ def name_callable_outputs(outputs: Any,
             raise ValueError(f'No outputs was returned {outputs=} and we expected '
                              f'"len(output_names)==0". However the following {output_names=} was specified')
 
-    if not isinstance(outputs, Tuple):
+    if not isinstance(outputs, tuple):
         outputs = (outputs, )
     assert len(outputs) == len(output_names), (f'The number of specified output names {output_names=} '
                                                f'does not match the actual number of outputs `{len(outputs)=}`')

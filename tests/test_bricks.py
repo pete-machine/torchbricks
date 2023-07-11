@@ -61,7 +61,7 @@ def test_brick_collection():
     brick_collection = create_brick_collection(num_classes=num_classes, num_backbone_featues=5)
     expected_forward_named_outputs = {'labels', 'raw', 'stage', 'preprocessed', 'features', 'predictions'}
     expected_named_losses = {'ce_loss'}
-    expected_named_metrics = set(brick_collection['metrics'].model[Stage.TRAIN.name])
+    expected_named_metrics = set(brick_collection['metrics'].metrics[Stage.TRAIN.name])
 
     model = bricks.BrickCollection(bricks=brick_collection)
     named_inputs = {'labels': torch.tensor(range(num_classes), dtype=torch.float64), 'raw': torch.zeros((3, 24, 24))}

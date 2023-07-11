@@ -73,7 +73,7 @@ def parse_argument_loss_output_names(loss_output_names: Union[List[str], str], a
 
 @typechecked
 class BrickModule(nn.Module, BrickInterface):
-    def __init__(self, model: nn.Module,
+    def __init__(self, model: Union[nn.Module, nn.ModuleDict],
                  input_names: Union[List[str], Dict[str, str], str],
                  output_names: List[str],
                  alive_stages: Union[List[Stage], str] = 'all',
@@ -100,7 +100,6 @@ class BrickModule(nn.Module, BrickInterface):
         if not self.run_now(stage=stage):
             return {}
 
-
         named_inputs['stage'] = stage
         named_outputs = named_input_and_outputs_callable(callable=self.model,
                                                          named_inputs=named_inputs,
@@ -120,7 +119,7 @@ class BrickModule(nn.Module, BrickInterface):
 
 @typechecked
 class BrickCollection(nn.ModuleDict):  # Note BrickCollection is inherently ModuleDict and acts as a dictionary of modules
-    def __init__(self, bricks: Dict[str, BrickInterface]) -> None:
+    def __init__(self, bricks: Dict[str, Union[BrickInterface]]) -> None:
         super().__init__(convert_nested_dict_to_nested_brick_collection(bricks))
 
     def forward(self, named_inputs: Dict[str, Any], stage: Stage, return_inputs: bool = True) -> Dict[str, Any]:
@@ -219,32 +218,32 @@ class BrickLoss(BrickModule):
 
 
 @typechecked
-class BrickMetricMultiple(BrickModule):
+class BrickMetricMultiple(BrickInterface, nn.Module):
     def __init__(self, metric_collection: Union[MetricCollection,  Dict[str, Metric]],
                  input_names: Union[List[str], Dict[str, str]],
                  alive_stages: Optional[List[Stage]] = None,
                  return_metrics: bool = False,
                  ):
 
-        if isinstance(metric_collection, dict):
-            metric_collection = MetricCollection(metric_collection)
         alive_stages = alive_stages or [Stage.TRAIN, Stage.TEST, Stage.VALIDATION]
         if return_metrics:
             output_names = list(metric_collection)
         else:
             output_names = []
+        BrickInterface.__init__(self, input_names=input_names, output_names=output_names, alive_stages=alive_stages)
+        nn.Module.__init__(self)
+
+        if isinstance(metric_collection, dict):
+            metric_collection = MetricCollection(metric_collection)
+
         self.return_metrics = return_metrics
-        metrics = nn.ModuleDict({stage.name: metric_collection.clone() for stage in alive_stages})
-        super().__init__(model=metrics, input_names=input_names, output_names=output_names, alive_stages=alive_stages,
-                         trainable=False,
-                         calculate_gradients=False)
+        self.metrics = nn.ModuleDict({stage.name: metric_collection.clone() for stage in alive_stages})
 
     def forward(self, named_inputs: Union[List[str], Dict[str, Any]], stage: Stage) -> Dict[str, Any]:
-        skip_forward = stage not in self.alive_stages
-        if skip_forward:
+        if not self.run_now(stage=stage):
             return {}
 
-        metric_collection = self.model[stage.name]
+        metric_collection = self.metrics[stage.name]
         if self.return_metrics:
             output_names = ['metrics']
             metric_callable = metric_collection  # Return metrics as a dictionary
@@ -256,7 +255,7 @@ class BrickMetricMultiple(BrickModule):
                                                   named_inputs=named_inputs,
                                                   input_names=self.input_names,
                                                   output_names=output_names,
-                                                  calculate_gradients=self.calculate_gradients(stage=stage))
+                                                  calculate_gradients=False)
         if self.return_metrics:
             return output['metrics']  # Metrics in a dictionary
         else:
@@ -267,7 +266,7 @@ class BrickMetricMultiple(BrickModule):
         return {}
 
     def summarize(self, stage: Stage, reset: bool) -> Dict[str, Any]:
-        metric_collection = self.model[stage.name]
+        metric_collection = self.metrics[stage.name]
         metrics = metric_collection.compute()
         if reset:
             metric_collection.reset()
