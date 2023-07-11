@@ -1,6 +1,7 @@
 from typing import Any, Callable, Dict, List, Tuple, Union
 
 import torch
+from typeguard import typechecked
 
 
 def check_input_names(named_inputs: Dict[str, Any],
@@ -33,6 +34,7 @@ def name_callable_outputs(outputs: Any,
     return dict(zip(output_names, outputs))
 
 
+@typechecked
 def named_input_and_outputs_callable(callable: Callable,
                                      named_inputs: Dict[str, Any],
                                      input_names: Union[List[str], Dict[str, str], str],

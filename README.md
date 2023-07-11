@@ -36,9 +36,9 @@ pip install torchbricks
 ```
 <!-- #endregion -->
 
-## Bricks by examples
+## Bricks by example
 
-First we specify regular pytorch modules: A preprocessor, a model and a classifier
+First we specify some regular model modules: A preprocessor, a model and a classifier
 
 ```python
 from typing import Tuple
@@ -65,13 +65,12 @@ class ClassifierDummy(nn.Module):
 
     def forward(self, tensor: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         logits = self.fc(torch.flatten(self.avgpool(tensor), start_dim = 1))
-        softmaxed = self.softmax(logits)
-        return logits, softmaxed
+        return logits, self.softmax(logits)
 ```
 
 
 ## Concept 1: Bricks are connected
-Using named input and output names, we specify howmodules are connected.
+Using input and output names, we specify how modules are connected.
 
 ```python
 from torchbricks.bricks import BrickCollection, BrickModule
@@ -85,23 +84,21 @@ bricks = {
 }
 ```
 
-<!-- #region -->
-All modules are added as entries in a regular dictionary and for each module we provide a name (dictionary key) and 
+All modules are added as entries in a regular dictionary and for each module, we provide a name (dictionary key) and 
 input and output names. The number of input and output names should match the actually number of input and output names 
 for each function. 
 
-The `preprocessor` uses a `raw` input tensor and outputs a `processed` tensor. The `backbone` uses a `processed` tensor and returns 
-the `embedding` tensor. Finally, the `head` uses `embedding`s and outputs both model `logits` and `softmaxed` tensors. 
+The `preprocessor` uses a `raw` input tensor and passed to the `processed` tensor to the `backbone`. The backbone returns 
+the `embedding` tensor and passes it to the `head` determining both `logits` and `softmaxed` tensors. 
 
-
-Bricks are then passed to what we call a `BrickCollection` for executing the bricks. 
-<!-- #endregion -->
+Bricks are then passed to a `BrickCollection` for executing bricks. The brick collection accepts a dictionary with required inputs and
+returns a dictionary with both intermediated and resulting tensors. 
 
 ```python
 brick_collection = BrickCollection(bricks)
 batch_images = torch.rand((2, 3, 100, 200))
-outputs = brick_collection(named_inputs={'raw': batch_images}, stage=Stage.TRAIN)
-print(outputs.keys())
+named_outputs = brick_collection(named_inputs={'raw': batch_images}, stage=Stage.TRAIN)
+print(named_outputs.keys())
 ```
 
 Running our models as a brick collection has the following advantages:
@@ -147,8 +144,6 @@ For `loss` we set `alive_stages=[Stage.TRAIN, Stage.VALIDATION, Stage.TEST]`.
 
 Also note that the `loss` brick requires an additional input called `targets`.
 
-
-
 ```python
 brick_collection = BrickCollection(bricks)
 batch_images = torch.rand((1, 3, 100, 200))
@@ -156,14 +151,14 @@ outputs_without_loss = brick_collection(named_inputs={'raw': batch_images}, stag
 outputs_with_loss = brick_collection(named_inputs={'raw': batch_images, "targets": torch.ones((1,3))}, stage=Stage.TRAIN)
 ```
 
+In above example, we execute `brick_collection` with both `Stage.INFERENCE` and `Stage.INFERENCE`.
+With `stage=Stage.INFERENCE`, it will act as before - the loss-module will not be executed and `targets` will not be required. 
 
-With `stage=Stage.INFERENCE`, the brick collection will act as before - the loss will not be executed and `targets` will not be required. 
-
-With `stage=Stage.TRAIN`, the brick collection requires `targets` and returns also the loss.
+With `stage=Stage.TRAIN`, we should also provide `targets` and losses are also returned.
 
 
 ## Concept 1 and 2 in a "real" use case
-We now want to demonstrate brick in a "real" use case. 
+We now want to demonstrate bricks in a "real" use case. 
 
 ```python
 import torchvision
@@ -219,6 +214,8 @@ This includes a `Preprocessor`, `ImageClassifier` and `resnet_to_brick` to conve
 
 The main motivation:
 
+- Each brick can return what ever - they are not forced to only returning e.g. logits... If you want the model backbone embeddings
+  you can do that to. 
 - Avoid modules within modules within modules to created models that are combined. 
 - Not flexible. It is possible to make the first encode/decode model... But adding a preprocessor, swapping out a backbone,
   adding additional heads or necks and sharing computations will typically not be easy. I ended up creating multiple modules that are
@@ -230,10 +227,20 @@ Including metrics and losses with the model.
 - The typical distinction between `encode`  / `decoder` becomes to limited... Multiple decoders might share a `neck`.
 
 
+## Brick features: 
+
+Missing sections:
+
+- [ ] Acts as a nn.Module
+- [ ] Acts as a dictionary - Nested brick collection
+- [ ] Export as ONNX
+- [ ] Pytorch lightning
+
+
 ## Use-case: Training with a collections of bricks
 
-By packing model modules, metrics and loss-functions into a brick collection and providing a `on_step`-function, we can more easily 
-inject any desired brick collection into your custom trainer without doing modifications to trainer.
+By packing model modules, metrics and loss-functions into a brick collection, we can more easily 
+inject any desired brick collection into your custom trainer without doing modifications to the trainer.
 
 ### Use-case: Training with pytorch-lightning trainer
 I like and love pytorch-lightning! We can avoid writing the easy-to-get-wrong training loop, write validation/test scrips.
@@ -277,19 +284,6 @@ trainer = pl.Trainer(accelerator="cpu", max_epochs=1, limit_train_batches=2, lim
 trainer.fit(bricks_lightning_module, datamodule=data_module)
 trainer.test(bricks_lightning_module, datamodule=data_module)
 ```
-
-By wrapping both core model computations, metrics and loss functions into a single brick collection, we can more easily swap between
-running model experiments in notebooks, trainings
-
-We provide a `forward` function to easily run model inference without targets and an `on_step` function
-to easily get metrics and losses in both
-
-
-## Nested brick collections
-Not shown here, a `BrickCollection` also supports a nested dictionary of bricks. A nested brick collections acts the same, 
-but it becomes easier to add and remove sub-collections bricks. 
-
-MISSING
 
 
 
@@ -338,6 +332,7 @@ MISSING
 - [ ] Add onnx export example to the README.md
 - [ ] Make DAG like functionality to check if a inputs and outputs works for all model stages.
 - [ ] Use pymy, pyright or pyre to do static code checks. 
+- [ ] Add typeguard
 - [ ] Decide: Add stage as an internal state and not in the forward pass:
   - Minor Pros: Tracing (to get onnx model) requires only torch.Tensors only as input - we avoid making an adapter class. 
   - Minor Cons: State gets hidden away - implicit instead of explicit.
@@ -347,6 +342,8 @@ MISSING
   - [ ] Make common brick collections: BricksImageClassification, BricksSegmentation, BricksPointDetection, BricksObjectDetection
 - [ ] Support preparing data in the dataloader?
 - [ ] Make common Visualizations with pillow - not opencv to not blow up the required dependencies. ImageClassification, Segmentation, ObjectDetection
+  - [ ] Maybe visualizations should be done in OpenCV it is faster. 
+- [ ] Support torch.jit.scripting? 
 
 ## How does it really work?
 ????

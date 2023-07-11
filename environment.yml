@@ -12,6 +12,7 @@ dependencies:
   - pytorch::pytorch=2.0.1  # A torchbrick package requirement
   - torchmetrics=0.11.4     # A torchbrick package requirement
   - onnx=1.14.0             # A torchbrick package requirement
+  - typeguard=3.0.2         # A torchbrick package requirement
   - pytorch::torchvision=0.15.2
   - pytorch::pytorch-cuda=11.7
   - pytorch-lightning=2.0.2

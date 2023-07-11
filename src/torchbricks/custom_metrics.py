@@ -1,8 +1,10 @@
 import torch
 from torchmetrics import Metric
 from torchmetrics.utilities.data import dim_zero_cat
+from typeguard import typechecked
 
 
+@typechecked
 class ConcatenatePredictionAndTarget(Metric):
     full_state_update = False  # Maybe this should be False?!
     def __init__(self, **kwargs):

@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Union
 import torch
 from torch import nn
 from torchmetrics import Metric, MetricCollection
+from typeguard import typechecked
 
 from torchbricks.bricks_helper import named_input_and_outputs_callable
 
@@ -45,6 +46,7 @@ class BrickInterface(ABC):
         """"""
 
 
+@typechecked
 def parse_argument_alive_stages(alive_stages: Union[List[Stage], str]) -> List[Stage]:
     available_stages = list(Stage)
     if alive_stages == 'all':
@@ -56,6 +58,7 @@ def parse_argument_alive_stages(alive_stages: Union[List[Stage], str]) -> List[S
     return alive_stages
 
 
+@typechecked
 def parse_argument_loss_output_names(loss_output_names: Union[List[str], str], available_output_names: List[str]) -> List[str]:
     if loss_output_names == 'all':
         loss_output_names = available_output_names
@@ -68,6 +71,7 @@ def parse_argument_loss_output_names(loss_output_names: Union[List[str], str], a
     return loss_output_names
 
 
+@typechecked
 class BrickModule(nn.Module, BrickInterface):
     def __init__(self, model: nn.Module,
                  input_names: Union[List[str], Dict[str, str], str],
@@ -114,7 +118,7 @@ class BrickModule(nn.Module, BrickInterface):
         return {}
 
 
-
+@typechecked
 class BrickCollection(nn.ModuleDict):  # Note BrickCollection is inherently ModuleDict and acts as a dictionary of modules
     def __init__(self, bricks: Dict[str, BrickInterface]) -> None:
         super().__init__(convert_nested_dict_to_nested_brick_collection(bricks))
@@ -147,6 +151,7 @@ class BrickCollection(nn.ModuleDict):  # Note BrickCollection is inherently Modu
         return metrics
 
 
+@typechecked
 def convert_nested_dict_to_nested_brick_collection(bricks: Dict[str, Union[BrickInterface, Dict]], level=0):
     converted_bricks = {}
     for name, brick in bricks.items():
@@ -161,6 +166,7 @@ def convert_nested_dict_to_nested_brick_collection(bricks: Dict[str, Union[Brick
         return BrickCollection(converted_bricks)
 
 
+@typechecked
 class BrickTrainable(BrickModule):
     def __init__(self, model: nn.Module,
                  input_names: Union[List[str], Dict[str, str]],
@@ -176,7 +182,7 @@ class BrickTrainable(BrickModule):
                          calculate_gradients=True,
                          trainable=True)
 
-
+@typechecked
 class BrickNotTrainable(BrickModule):
     def __init__(self, model: nn.Module,
                  input_names: Union[List[str], Dict[str, str]],
@@ -193,6 +199,7 @@ class BrickNotTrainable(BrickModule):
                          trainable=False)
 
 
+@typechecked
 class BrickLoss(BrickModule):
     def __init__(self, model: nn.Module,
                  input_names: Union[List[str], Dict[str, str]],
@@ -211,6 +218,7 @@ class BrickLoss(BrickModule):
                          trainable=True)
 
 
+@typechecked
 class BrickMetricMultiple(BrickModule):
     def __init__(self, metric_collection: Union[MetricCollection,  Dict[str, Metric]],
                  input_names: Union[List[str], Dict[str, str]],
@@ -231,7 +239,7 @@ class BrickMetricMultiple(BrickModule):
                          trainable=False,
                          calculate_gradients=False)
 
-    def forward(self, named_inputs: Union[List[str], Dict[str, str]], stage: Stage) -> Dict[str, Any]:
+    def forward(self, named_inputs: Union[List[str], Dict[str, Any]], stage: Stage) -> Dict[str, Any]:
         skip_forward = stage not in self.alive_stages
         if skip_forward:
             return {}
@@ -266,6 +274,7 @@ class BrickMetricMultiple(BrickModule):
 
         return metrics
 
+@typechecked
 class BrickMetricSingle(BrickMetricMultiple):
     def __init__(self,
                  metric: Metric,
@@ -278,17 +287,19 @@ class BrickMetricSingle(BrickMetricMultiple):
                          return_metrics=return_metrics)
 
 
+@typechecked
 class OnnxExportAdaptor(nn.Module):
     def __init__(self, model: nn.Module, stage: Stage) -> None:
         super().__init__()
         self.model = model
         self.stage = stage
 
-    def forward(self, named_inputs):
+    def forward(self, named_inputs: Dict[str, Any]):
         named_outputs = self.model.forward(named_inputs=named_inputs, stage=self.stage, return_inputs=False)
         return named_outputs
 
 
+@typechecked
 def export_as_onnx(brick_collection: BrickCollection,
                    named_inputs: Dict[str, torch.Tensor],
                    path_onnx: Path,

@@ -80,12 +80,13 @@ class ImageClassifier(nn.Module):
         return logits, probabilities, class_prediction
 
 
-class Preprocessor:
+class Preprocessor(nn.Module):
     def __init__(
         self,
         mean=(0.485, 0.456, 0.406),
         std=(0.229, 0.224, 0.225),
     ):
+        super().__init__()
         self.transforms = transforms.Normalize(mean=mean, std=std)
 
     def __call__(self, img):
