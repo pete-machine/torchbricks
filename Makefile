@@ -84,6 +84,8 @@ clean:                   ## Clean unused files.
 
 .PHONY: release
 release:          ## Create a new tag for release.
+	bumpver update --patch --push
+
 # bumpver update --patch
 # git push origin 0.0.5
 

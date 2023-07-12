@@ -89,8 +89,9 @@ for each function.
 
 Each module is wrapped inside a brick - here either `BrickTrainable` and `BrickNotTrainable`.
 
-The `preprocessor` uses a `raw` input tensor and passes the `processed` tensor to the `backbone`. The backbone returns 
-the `embedding` tensor and passes it to the `head` determining both `logits` and `softmaxed` tensors. 
+The `bricks`-dictionary describe how data is passed between bricks: The `preprocessor` uses a `raw` input tensor and passes the
+`processed` tensor to the `backbone`. The backbone returns the `embedding` tensor and passes it to the `head` determining 
+both `logits` and `softmaxed` tensors. 
 
 Bricks are then passed to a `BrickCollection` for executing bricks. The brick collection accepts a dictionary with required inputs and
 returns a dictionary with both intermediated and resulting tensors. 
@@ -344,6 +345,7 @@ MISSING
 - [x] Ensure that all examples in the `README.md` are working with easy to use modules. 
 - [x] Add typeguard
 - [x] Allow a brick to receive all named_inputs and add a test for it.
+- [x] Fix the release process. It should be as simple as running `make release`.
 - [ ] Add onnx export example to the README.md
 - [ ] Make DAG like functionality to check if a inputs and outputs works for all model stages.
 - [ ] Use pymy, pyright or pyre to do static code checks. 
