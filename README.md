@@ -17,16 +17,6 @@ jupyter:
 
 -->
 
-# TorchBricks
-
-[![codecov](https://codecov.io/gh/PeteHeine/torchbricks/branch/main/graph/badge.svg?token=torchbricks_token_here)](https://codecov.io/gh/PeteHeine/torchbricks)
-[![CI](https://github.com/PeteHeine/torchbricks/actions/workflows/main.yml/badge.svg)](https://github.com/PeteHeine/torchbricks/actions/workflows/main.yml)
-
-TorchBricks builds pytorch models using small reuseable and decoupled parts - we call them bricks.
-
-The concept is simple and flexible and allows you to more easily combine, add more or swap out parts of the model (preprocessor, backbone, neck, head or post-processor), change the task or extend it with multiple tasks.
-
-
 <!-- #region -->
 
 ## Install it with pip
@@ -98,7 +88,8 @@ returns a dictionary with both intermediated and resulting tensors.
 
 ```python
 brick_collection = BrickCollection(bricks)
-batch_images = torch.rand((2, 3, 100, 200))
+batch_size=2
+batch_images = torch.rand((batch_size, 3, 100, 200))
 named_outputs = brick_collection(named_inputs={'raw': batch_images}, stage=Stage.INFERENCE)
 print(named_outputs.keys())
 ```
@@ -131,17 +122,19 @@ In above example this is not particular interesting - because preprocessor, back
 So we will demonstrate by adding a loss brick (`BrickLoss`) and specifying `alive_stages` for each brick.
 
 ```python
+num_classes = 3
 bricks = {
     'preprocessor': BrickNotTrainable(PreprocessorDummy(), input_names=['raw'], output_names=['processed'], alive_stages="all"),
-    'backbone': BrickTrainable(TinyModel(n_channels=3, n_features=10), input_names=['processed'], output_names=['embedding'], alive_stages="all"),
-    'head': BrickTrainable(ClassifierDummy(num_classes=3, in_features=10), input_names=['embedding'], output_names=['logits', 'softmaxed'], 
-                                    alive_stages="all"),
+    'backbone': BrickTrainable(TinyModel(n_channels=num_classes, n_features=10), input_names=['processed'], output_names=['embedding'], 
+                               alive_stages="all"),
+    'head': BrickTrainable(ClassifierDummy(num_classes=num_classes, in_features=10), input_names=['embedding'], 
+                           output_names=['logits', 'softmaxed'], alive_stages="all"),
     'loss': BrickLoss(model=nn.CrossEntropyLoss(), input_names=['logits', 'targets'], output_names=['loss_ce'], 
                       alive_stages=[Stage.TRAIN, Stage.VALIDATION, Stage.TEST], loss_output_names="all")
 }
+brick_collection = BrickCollection(bricks)
 ```
 
-<!-- #region -->
 We set `preprocessor`, `backbone` and `head` to be alive on all stages `alive_stages="all"` - this is the default behavior and
 similar to before. 
 
@@ -152,14 +145,19 @@ Another advantages is that model have different input requirements for different
 
 For `Stage.INFERENCE` and `Stage.EXPROT` stages, the model only requires the `raw` tensor as input. 
 
-While for `Stage.TRAIN`, `Stage.VALIDATION` and `Stage.TEST` stages, the model requires both `raw` and `targets` input tensors.
+```python
+named_outputs_without_loss = brick_collection(named_inputs={'raw': batch_images}, stage=Stage.INFERENCE)   
+```
 
+<!-- #region -->
+
+
+For `Stage.TRAIN`, `Stage.VALIDATION` and `Stage.TEST` stages, the model requires both `raw` and `targets` input tensors.
+<!-- #endregion -->
 
 ```python
-    named_outputs_without_loss = brick_collection(named_inputs={'raw': batch_images}, stage=Stage.INFERENCE)
-    named_outputs_with_loss = brick_collection(named_inputs={'raw': batch_images, "targets": torch.ones((1,3))}, stage=Stage.TRAIN)
+named_outputs_with_loss = brick_collection(named_inputs={'raw': batch_images, "targets": torch.ones((batch_size,3))}, stage=Stage.TRAIN)
 ```
-<!-- #endregion -->
 
 ## Bricks for model training
 We are not creating a training framework, but to easily use the brick collection in your favorite training framework or custom 
@@ -187,7 +185,7 @@ bricks = {
 }
 
 brick_collection = BrickCollection(bricks)
-named_inputs = {"raw": batch_images, "targets": torch.ones((2), dtype=torch.int64)}
+named_inputs = {"raw": batch_images, "targets": torch.ones((batch_size), dtype=torch.int64)}
 named_outputs = brick_collection(named_inputs=named_inputs, stage=Stage.TRAIN)
 named_outputs = brick_collection(named_inputs=named_inputs, stage=Stage.TRAIN)
 named_outputs = brick_collection(named_inputs=named_inputs, stage=Stage.TRAIN)
@@ -234,9 +232,9 @@ Including metrics and losses with the model.
 
 Missing sections:
 
-- [ ] Acts as a nn.Module
+- [x] Export as ONNX
+- [x] Acts as a nn.Module
 - [ ] Acts as a dictionary - Nested brick collection
-- [ ] Export as ONNX
 - [ ] Training with Pytorch lightning
 - [ ] Pass all inputs as a dictionary `input_names='all'`
 - [ ] Using stage inside module
@@ -247,6 +245,47 @@ Missing sections:
 - [ ] In this example we do not use `BrickModule` to build our collection - you can do that -
 but instead we recommend using our pre-configured brick modules (`BrickLoss`, `BrickNotTrainable`, `BrickTrainable`, 
 `BrickMetricSingle` and `BrickCollection`) to both ensure sensible defaults and to show the intend of each brick. 
+
+
+### Brick features: Export as ONNX
+To export a brick collection as onnx we provide the `export_bricks_as_onnx`-function. 
+
+Pass an example input (`named_input`) to trace a brick collection.
+Set `dynamic_batch_size=True` to support any batch size inputs and here we explicitly set `stage=Stage.EXPORT` - this is also 
+the default.
+
+```python
+from pathlib import Path
+from torchbricks.brick_utils import export_bricks_as_onnx
+path_onnx = Path("build/readme_model.onnx")
+export_bricks_as_onnx(path_onnx=path_onnx, 
+                      brick_collection=brick_collection, 
+                      named_inputs=named_inputs, 
+                      dynamic_batch_size=True, 
+                      stage=Stage.EXPORT)
+```
+
+### Brick features: Act as a nn.Module
+A brick collection acts as a 'nn.Module' mean we can do the following: 
+
+```python
+# Move to specify device (CPU/GPU) or precision to automatically move model parameters
+brick_collection_half = brick_collection.to(torch.float16)
+
+
+# Save model parameters
+path_model = Path("build/readme_model.pt")
+torch.save(brick_collection_half.state_dict(), path_model)
+
+# Load model parameters
+brick_collection_half.load_state_dict(torch.load(path_model))
+
+# Access parameters
+brick_collection_half.named_parameters()
+```
+
+
+
 
 
 ### Bag of bricks - reusable bricks modules
@@ -346,7 +385,7 @@ MISSING
 - [x] Add typeguard
 - [x] Allow a brick to receive all named_inputs and add a test for it.
 - [x] Fix the release process. It should be as simple as running `make release`.
-- [ ] Add onnx export example to the README.md
+- [x] Add onnx export example to the README.md
 - [ ] Make DAG like functionality to check if a inputs and outputs works for all model stages.
 - [ ] Use pymy, pyright or pyre to do static code checks. 
 - [ ] Decide: Add stage as an internal state and not in the forward pass:
