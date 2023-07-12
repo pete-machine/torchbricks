@@ -100,9 +100,6 @@ class BrickModule(nn.Module, BrickInterface):
         return stage in self.calculate_gradients_on
 
     def forward(self, named_inputs: Dict[str, Any], stage: Stage) -> Dict[str, Any]:
-        if not self.run_now(stage=stage):
-            return {}
-
         named_inputs['stage'] = stage
         named_outputs = named_input_and_outputs_callable(callable=self.model,
                                                          named_inputs=named_inputs,
@@ -240,9 +237,6 @@ class BrickMetrics(BrickInterface, nn.Module):
         self.metrics = nn.ModuleDict({stage.name: metric_collection.clone() for stage in alive_stages})
 
     def forward(self, named_inputs: Dict[str, Any], stage: Stage) -> Dict[str, Any]:
-        if not self.run_now(stage=stage):
-            return {}
-
         metric_collection = self.metrics[stage.name]
         if self.return_metrics:
             output_names = ['metrics']

@@ -84,10 +84,10 @@ bricks = {
 ```
 
 All modules are added as entries in a regular dictionary and for each module, we provide a name (dictionary key) and 
-input and output names. The number of input and output names should match the actually number of input and output names 
+input and output names. The number of input and output names should match the actually number of input and outputs 
 for each function. 
 
-Each model is wrapped inside a brick either `BrickTrainable` and `BrickNotTrainable`.
+Each module is wrapped inside a brick - here either `BrickTrainable` and `BrickNotTrainable`.
 
 The `preprocessor` uses a `raw` input tensor and passes the `processed` tensor to the `backbone`. The backbone returns 
 the `embedding` tensor and passes it to the `head` determining both `logits` and `softmaxed` tensors. 
@@ -111,12 +111,12 @@ executes each bricks and ensures that the outputs are passed to the inputs of ot
 Structuring the model as a DAG, makes it easy to add/remove outputs for a given module during development, add new modules to the
 collection and build completely new models from reusable parts. 
 - A brick collection is actually a dictionary (`nn.DictModule`). Allowing you to access, pop and update the 
-  collection easily as a regular dictionary. It can to handle nested dictionary, allowing groups of bricks to be added/removed easily. 
+  collection easily as a regular dictionary. It can also handle nested dictionary, allowing groups of bricks to be added/removed easily. 
 
 Note also that we set `stage=Stage.INFERENCE` to explicitly specify if we are doing training, validation, test or inference.
 Specifying a stage is important, if we want a module to act in a specific way during specific stages.
-We will get back to this in the next section.
 
+Leading us to the next section
 
 
 ## Concept 2: Bricks can be dead or alive
@@ -161,10 +161,10 @@ While for `Stage.TRAIN`, `Stage.VALIDATION` and `Stage.TEST` stages, the model r
 <!-- #endregion -->
 
 ## Bricks for model training
-We are not creating a training framework, but to easily use the brick collection in your favorite training framework or custom training 
-loop, we need the final piece. We should be able to calculate and gather metrics across a whole dataset. 
+We are not creating a training framework, but to easily use the brick collection in your favorite training framework or custom 
+training/validation/test loop, we need the final piece. We should be able to calculate and gather metrics across a whole dataset. 
 
-We will extend our example from before by adding metric bricks and using reusable components from `torchbricks.bag_of_bricks`.
+We will extend our example from before by adding metric bricks and common reusable components from `torchbricks.bag_of_bricks`.
 
 ```python
 import torchvision
@@ -196,23 +196,18 @@ print(f"{metrics=}, {named_outputs.keys()=}")
 ```
 
 
+On each `forward`-call, we calculate model outputs, losses and metrics for each batch. Metrics are aggregated internally in `BrickMetricSingle` 
+and only returned with the `summarize`-call. We set `reset=True` to reset metric aggregation. 
+
 For metrics, we rely on the [TorchMetrics](https://torchmetrics.readthedocs.io/en/stable/) library and passes either a single 
 metric (`torchmetrics.Metric`) to `BrickMetricSingle` or a collection of metrics (`torchmetrics.MetricCollection`) to `BrickMetrics`.
 
-For multiple metrics, use always `BrickMetrics` with `torchmetrics.MetricCollection`. 
-
-On each `forward`, we calculate model outputs, losses and metrics for each batch. Metrics are aggregated internally in `BrickMetricSingle` 
-and only returned with the `summarize`-call. We set `reset=True` to reset metric aggregation. 
+For multiple metrics, use always `BrickMetrics` with `torchmetrics.MetricCollection` [doc](https://torchmetrics.readthedocs.io/en/stable/pages/overview.html#metriccollection). 
+It has some intelligent mechanisms for sharing 
+metrics stats. 
 
 Note also that metrics are not passed to other bricks - they are only stored internally. To also pass metrics to other bricks
-you can set `return_metrics=True` for `BrickMetrics` and `BrickMetricSingle`.
-
-
-### Bag of bricks - reusable bricks modules
-Note also in above example we use bag-of-bricks to import commonly used `nn.Module`s 
-
-This includes a `Preprocessor`, `ImageClassifier` and `resnet_to_brick` to convert torchvision resnet models into a backbone brick 
-(without a classifier).
+(and add computational cost) you can set `return_metrics=True` for `BrickMetrics` and `BrickMetricSingle`.
 
 
 ## Bricks motivation (to be continued)
@@ -226,6 +221,8 @@ The main motivation:
   adding additional heads or necks and sharing computations will typically not be easy. I ended up creating multiple modules that are
   called within other modules... All head/modules pass dictionaries between modules. 
 - Typically not very reusable. 
+- By packing model modules, metrics and loss-functions into a brick collection, we can more easily 
+inject any desired brick collection into your custom trainer without doing modifications to the trainer.
 
 Including metrics and losses with the model. 
 - Model, metrics and losses are connected. If we want to add an additional head to a model - we should also add losses and metrics. 
@@ -251,10 +248,12 @@ but instead we recommend using our pre-configured brick modules (`BrickLoss`, `B
 `BrickMetricSingle` and `BrickCollection`) to both ensure sensible defaults and to show the intend of each brick. 
 
 
-## Use-case: Training with a collections of bricks
+### Bag of bricks - reusable bricks modules
+Note also in above example we use bag-of-bricks to import commonly used `nn.Module`s 
 
-By packing model modules, metrics and loss-functions into a brick collection, we can more easily 
-inject any desired brick collection into your custom trainer without doing modifications to the trainer.
+This includes a `Preprocessor`, `ImageClassifier` and `resnet_to_brick` to convert torchvision resnet models into a backbone brick 
+(without a classifier).
+
 
 ### Use-case: Training with pytorch-lightning trainer
 I like and love pytorch-lightning! We can avoid writing the easy-to-get-wrong training loop, write validation/test scrips.
@@ -344,6 +343,7 @@ MISSING
   - [x] Introduce metrics by it-self in another example
 - [x] Ensure that all examples in the `README.md` are working with easy to use modules. 
 - [x] Add typeguard
+- [x] Allow a brick to receive all named_inputs and add a test for it.
 - [ ] Add onnx export example to the README.md
 - [ ] Make DAG like functionality to check if a inputs and outputs works for all model stages.
 - [ ] Use pymy, pyright or pyre to do static code checks. 

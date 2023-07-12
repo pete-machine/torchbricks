@@ -302,3 +302,19 @@ def test_export_onnx_trace(tmp_path: Path):
         assert set(expected_input) == input_names_graph
 
         onnx.checker.check_model(onnx_model)
+
+
+@pytest.mark.xfail
+def test_export_torch_jit_script(tmp_path: Path):
+    num_classes = 3
+    brick_collection = create_brick_collection(num_classes=num_classes, num_backbone_featues=10)
+    model = BrickCollection(brick_collection)
+    named_inputs = {'raw': torch.zeros((1, 3, 64, 64))}
+
+    stage = Stage.EXPORT
+    named_outputs = model(named_inputs, stage=stage, return_inputs=False)
+    # remove_from_outputs = ["stage"] + list(named_inputs)
+    list(named_inputs)
+    list(named_outputs)
+
+    torch.jit.script(model)
