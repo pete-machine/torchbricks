@@ -67,9 +67,15 @@ from torchbricks.bricks import BrickCollection, BrickTrainable, BrickNotTrainabl
 from torchbricks.bricks import Stage
 
 bricks = {
-    'preprocessor': BrickNotTrainable(PreprocessorDummy(), input_names=['raw'], output_names=['processed']),
-    'backbone': BrickTrainable(TinyModel(n_channels=3, n_features=10), input_names=['processed'], output_names=['embedding']),
-    'head': BrickTrainable(ClassifierDummy(num_classes=3, in_features=10), input_names=['embedding'], output_names=['logits', "softmaxed"]),
+    'preprocessor': BrickNotTrainable(PreprocessorDummy(), 
+                                      input_names=['raw'], 
+                                      output_names=['processed']),
+    'backbone': BrickTrainable(TinyModel(n_channels=3, n_features=10), 
+                               input_names=['processed'], 
+                               output_names=['embedding']),
+    'head': BrickTrainable(ClassifierDummy(num_classes=3, in_features=10), 
+                           input_names=['embedding'], 
+                           output_names=['logits', "softmaxed"]),
 }
 brick_collection = BrickCollection(bricks)
 print(brick_collection)
@@ -130,13 +136,22 @@ So we will demonstrate by adding a loss brick (`BrickLoss`) and specifying `aliv
 ```python
 num_classes = 3
 bricks = {
-    'preprocessor': BrickNotTrainable(PreprocessorDummy(), input_names=['raw'], output_names=['processed'], alive_stages="all"),
-    'backbone': BrickTrainable(TinyModel(n_channels=num_classes, n_features=10), input_names=['processed'], output_names=['embedding'], 
+    'preprocessor': BrickNotTrainable(PreprocessorDummy(), 
+                                      input_names=['raw'], 
+                                      output_names=['processed'], 
+                                      alive_stages="all"),
+    'backbone': BrickTrainable(TinyModel(n_channels=num_classes, n_features=10), 
+                               input_names=['processed'], 
+                               output_names=['embedding'], 
                                alive_stages="all"),
-    'head': BrickTrainable(ClassifierDummy(num_classes=num_classes, in_features=10), input_names=['embedding'], 
-                           output_names=['logits', 'softmaxed'], alive_stages="all"),
-    'loss': BrickLoss(model=nn.CrossEntropyLoss(), input_names=['logits', 'targets'], output_names=['loss_ce'], 
-                      alive_stages=[Stage.TRAIN, Stage.VALIDATION, Stage.TEST], loss_output_names="all")
+    'head': BrickTrainable(ClassifierDummy(num_classes=num_classes, in_features=10), 
+                           input_names=['embedding'], 
+                           output_names=['logits', 'softmaxed'], 
+                           alive_stages="all"),
+    'loss': BrickLoss(model=nn.CrossEntropyLoss(), 
+                      input_names=['logits', 'targets'], 
+                      output_names=['loss_ce'], 
+                      alive_stages=[Stage.TRAIN, Stage.VALIDATION, Stage.TEST])
 }
 brick_collection = BrickCollection(bricks)
 
@@ -160,7 +175,8 @@ Another advantages is that model have different input requirements for different
 For `Stage.INFERENCE` and `Stage.EXPROT` stages, the model only requires the `raw` tensor as input. 
 
 ```python
-named_outputs_without_loss = brick_collection(named_inputs={'raw': batch_images}, stage=Stage.INFERENCE)   
+named_outputs_without_loss = brick_collection(named_inputs={'raw': batch_images}, 
+                                              stage=Stage.INFERENCE)   
 ```
 
 <!-- #region -->
@@ -170,7 +186,9 @@ For `Stage.TRAIN`, `Stage.VALIDATION` and `Stage.TEST` stages, the model require
 <!-- #endregion -->
 
 ```python
-named_outputs_with_loss = brick_collection(named_inputs={'raw': batch_images, "targets": torch.ones((batch_size,3))}, stage=Stage.TRAIN)
+targets = torch.ones((batch_size,3))
+named_outputs_with_loss = brick_collection(named_inputs={'raw': batch_images, "targets": targets}, 
+                                           stage=Stage.TRAIN)
 ```
 
 ## Bricks for model training
@@ -188,14 +206,20 @@ from torchmetrics.classification import MulticlassAccuracy
 num_classes = 10
 resnet = torchvision.models.resnet18(weights=None, num_classes=num_classes)
 resnet_brick = resnet_to_brick(resnet=resnet,  input_name='normalized', output_name='features')
-
+n_features = resnet_brick.model.n_backbone_features
 bricks = {
-    'preprocessor': BrickNotTrainable(Preprocessor(), input_names=['raw'], output_names=['normalized']),
+    'preprocessor': BrickNotTrainable(Preprocessor(), 
+                                      input_names=['raw'], 
+                                      output_names=['normalized']),
     'backbone': resnet_brick,
-    'head': BrickTrainable(ImageClassifier(num_classes=num_classes, n_features=resnet_brick.model.n_backbone_features),
-                                     input_names=['features'], output_names=['logits', 'probabilities', 'class_prediction']),
-    'accuracy': BrickMetricSingle(MulticlassAccuracy(num_classes=num_classes), input_names=['class_prediction', 'targets']),
-    'loss': BrickLoss(model=nn.CrossEntropyLoss(), input_names=['logits', 'targets'], output_names=['loss_ce'])
+    'head': BrickTrainable(ImageClassifier(num_classes=num_classes, n_features=n_features),
+                           input_names=['features'], 
+                           output_names=['logits', 'probabilities', 'class_prediction']),
+    'accuracy': BrickMetricSingle(MulticlassAccuracy(num_classes=num_classes), 
+                                  input_names=['class_prediction', 'targets']),
+    'loss': BrickLoss(model=nn.CrossEntropyLoss(), 
+                      input_names=['logits', 'targets'], 
+                      output_names=['loss_ce'])
 }
 
 brick_collection = BrickCollection(bricks)
@@ -311,22 +335,28 @@ from typing import Dict
 from torchbricks.bricks import BrickInterface
 
 
-def image_classifier_head(num_classes: int, in_channels: int) -> Dict[str, BrickInterface]:
+def image_classifier_head(num_classes: int, in_channels: int, input_name: str) -> Dict[str, BrickInterface]:
     """Image classifier bricks: Classifier, loss and metrics """
     head = {
         'classify': BrickTrainable(ImageClassifier(num_classes=num_classes, n_features=in_channels),
-                                   input_names=['features'], output_names=['./logits', './probabilities', './class_prediction']),
-        'accuracy': BrickMetricSingle(MulticlassAccuracy(num_classes=num_classes), input_names=['./class_prediction', 'targets']),
-        'loss': BrickLoss(model=nn.CrossEntropyLoss(), input_names=['./logits', 'targets'], output_names=['./loss_ce'])
+                                   input_names=[input_name], 
+                                   output_names=['./logits', './probabilities', './class_prediction']),
+        'accuracy': BrickMetricSingle(MulticlassAccuracy(num_classes=num_classes), 
+                                      input_names=['./class_prediction', 'targets']),
+        'loss': BrickLoss(model=nn.CrossEntropyLoss(),
+                          input_names=['./logits', 'targets'], 
+                          output_names=['./loss_ce'])
     }
     return head
 
-
+n_features = resnet_brick.model.n_backbone_features
 bricks = {
-    'preprocessor': BrickNotTrainable(Preprocessor(), input_names=['raw'], output_names=['normalized']),
+    'preprocessor': BrickNotTrainable(Preprocessor(), 
+                                      input_names=['raw'], 
+                                      output_names=['normalized']),
     'backbone': resnet_brick,
-    'head0': image_classifier_head(num_classes=3, in_channels=resnet_brick.model.n_backbone_features),
-    'head1': image_classifier_head(num_classes=5, in_channels=resnet_brick.model.n_backbone_features),
+    'head0': image_classifier_head(num_classes=3, in_channels=n_features, input_name='features'),
+    'head1': image_classifier_head(num_classes=5, in_channels=n_features, input_name='features'),
 }
 print(BrickCollection(bricks))
 # BrickCollection(
@@ -443,8 +473,10 @@ MISSING
 - [x] Allow a brick to receive all named_inputs and add a test for it.
 - [x] Fix the release process. It should be as simple as running `make release`.
 - [x] Add onnx export example to the README.md
-- [ ] Pretty print bricks
-- [ ] Relative input/output names
+- [x] Pretty print bricks
+- [x] Relative input/output names
+- [ ] Test to verify that environment matches conda lock. The make command 'update-lock-file' should store a copy of 'environment.yml'
+      We will the have a test checking if the copy and the current version of `environment.yml` is the same.
 - [ ] Make DAG like functionality to check if a inputs and outputs works for all model stages.
 - [ ] Use pymy, pyright or pyre to do static code checks. 
 - [ ] Decide: Add stage as an internal state and not in the forward pass:
