@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from enum import Enum
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 from torch import nn
@@ -9,19 +10,20 @@ from typeguard import typechecked
 from torchbricks.bricks_helper import named_input_and_outputs_callable
 
 
-class Stage(Enum):              # Gradients   Eval-model    Targets
-    TRAIN = 'train'             # Y                   Y             Y
-    VALIDATION = 'validation'   # N                   N             Y
-    TEST = 'test'               # N                   N             Y
-    INFERENCE = 'inference'     # N                   N             N
-    EXPORT = 'export'           # N                   N             N
+class Stage(Enum):
+    TRAIN = 'train'
+    VALIDATION = 'validation'
+    TEST = 'test'
+    INFERENCE = 'inference'
+    EXPORT = 'export'
 
 
 class BrickInterface(ABC):
     def __init__(self,
                  input_names: Union[List[str], Dict[str, str], str],
                  output_names: List[str],
-                 alive_stages: Union[List[Stage], str] = 'all',
+                 alive_stages: Union[List[Stage], str],
+                 wrapped_module_name: str,
                  ) -> None:
         super().__init__()
         if isinstance(input_names, str):
@@ -30,6 +32,7 @@ class BrickInterface(ABC):
         self.input_names = input_names
         self.output_names = output_names
         self.alive_stages: List[Stage] = parse_argument_alive_stages(alive_stages)
+        self.wrapped_module_name = wrapped_module_name
 
     def run_now(self, stage: Stage) -> bool:
         return stage in self.alive_stages
@@ -45,6 +48,13 @@ class BrickInterface(ABC):
     @abstractmethod
     def summarize(self, stage: Stage, reset: bool) -> Dict[str, Any]:
         """"""
+
+    def __repr__(self) -> str:
+        input_names = self.input_names
+        output_names = self.output_names
+        alive_stages = [phase.name for phase in self.alive_stages]
+        return f'{self.__class__.__name__}({self.wrapped_module_name}, {input_names=}, {output_names=}, {alive_stages=})'
+
 
 
 @typechecked
@@ -82,7 +92,11 @@ class BrickModule(nn.Module, BrickInterface):
                  calculate_gradients: bool = True,
                  trainable: bool = True) -> None:
         nn.Module.__init__(self)
-        BrickInterface.__init__(self, input_names=input_names, output_names=output_names, alive_stages=alive_stages)
+        BrickInterface.__init__(self,
+                                input_names=input_names,
+                                output_names=output_names,
+                                alive_stages=alive_stages,
+                                wrapped_module_name=model.__class__.__name__)
         self.model = model
         self.loss_output_names = parse_argument_loss_output_names(loss_output_names, available_output_names=output_names)
 
@@ -113,11 +127,16 @@ class BrickModule(nn.Module, BrickInterface):
     def summarize(self, stage: Stage, reset: bool) -> Dict[str, Any]:
         return {}
 
+    def __repr__(self):  # Overwrite '__repr__' of 'BrickModule'
+        return BrickInterface.__repr__(self)
+
 
 @typechecked
 class BrickCollection(nn.ModuleDict):
     def __init__(self, bricks: Dict[str, BrickInterface]) -> None:
+        resolve_relative_names(bricks=bricks)
         super().__init__(convert_nested_dict_to_nested_brick_collection(bricks))
+
 
     def forward(self, named_inputs: Dict[str, Any], stage: Stage, return_inputs: bool = True) -> Dict[str, Any]:
         gathered_named_io = dict(named_inputs)  # To keep the argument `named_inputs` unchanged
@@ -146,7 +165,6 @@ class BrickCollection(nn.ModuleDict):
             metrics.update(brick.summarize(stage=stage, reset=reset))
         return metrics
 
-
 @typechecked
 def convert_nested_dict_to_nested_brick_collection(bricks: Dict[str, Union[BrickInterface, Dict]], level=0):
     converted_bricks = {}
@@ -160,6 +178,36 @@ def convert_nested_dict_to_nested_brick_collection(bricks: Dict[str, Union[Brick
         return converted_bricks
     else:
         return BrickCollection(converted_bricks)
+
+
+def resolve_relative_names(bricks: Dict[str, BrickInterface]):
+    return _resolve_relative_names_recursive(bricks)
+
+def _resolve_relative_names_recursive(bricks: Dict[str, BrickInterface], parent: Optional[Path] = None):
+    parent = parent or Path('/root')
+    for brick_name, brick_or_bricks in bricks.items():
+        if isinstance(brick_or_bricks, (dict, BrickCollection)):
+            _resolve_relative_names_recursive(bricks=brick_or_bricks, parent=parent / brick_name)
+        elif isinstance(brick_or_bricks, BrickInterface):
+            brick_or_bricks.input_names = _resolve_input_or_output_names(brick_or_bricks.input_names, parent)
+            brick_or_bricks.output_names = _resolve_input_or_output_names(brick_or_bricks.output_names, parent)
+        else:
+            raise ValueError('')
+
+    return bricks
+
+def _resolve_input_or_output_names(input_or_output_names: List[str], parent: Path):
+    input_names_resolved = []
+    for input_name in input_or_output_names:
+        is_relative_name = input_name[0] == '.'
+        if is_relative_name:
+            input_name_as_path = Path(parent / input_name).resolve()
+            if len(input_name_as_path.parents) == 1:
+                raise ValueError(f'Failed to resolve input name. Unable to resolve "{input_name}" in brick "{parent.relative_to("/root")}" '
+                                  'to an actual name. ')
+            input_name = str(input_name_as_path.relative_to('/root'))
+        input_names_resolved.append(input_name)
+    return input_names_resolved
 
 
 @typechecked
@@ -225,7 +273,12 @@ class BrickMetrics(BrickInterface, nn.Module):
             output_names = list(metric_collection)
         else:
             output_names = []
-        BrickInterface.__init__(self, input_names=input_names, output_names=output_names, alive_stages=alive_stages)
+
+        BrickInterface.__init__(self,
+                                input_names=input_names,
+                                output_names=output_names,
+                                alive_stages=alive_stages,
+                                wrapped_module_name=f'{list(metric_collection)}')
         nn.Module.__init__(self)
 
         if isinstance(metric_collection, dict):

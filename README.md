@@ -71,28 +71,34 @@ bricks = {
     'backbone': BrickTrainable(TinyModel(n_channels=3, n_features=10), input_names=['processed'], output_names=['embedding']),
     'head': BrickTrainable(ClassifierDummy(num_classes=3, in_features=10), input_names=['embedding'], output_names=['logits', "softmaxed"]),
 }
+brick_collection = BrickCollection(bricks)
+print(brick_collection)
+# BrickCollection(
+#   (preprocessor): BrickNotTrainable(PreprocessorDummy, input_names=['raw'], output_names=['processed'], alive_stages=['TRAIN', 'VALIDATION', 'TEST', 'INFERENCE', 'EXPORT'])
+#   (backbone): BrickTrainable(TinyModel, input_names=['processed'], output_names=['embedding'], alive_stages=['TRAIN', 'VALIDATION', 'TEST', 'INFERENCE', 'EXPORT'])
+#   (head): BrickTrainable(ClassifierDummy, input_names=['embedding'], output_names=['logits', 'softmaxed'], alive_stages=['TRAIN', 'VALIDATION', 'TEST', 'INFERENCE', 'EXPORT'])
+# )
 ```
 
-All modules are added as entries in a regular dictionary and for each module, we provide a name (dictionary key) and 
-input and output names. The number of input and output names should match the actually number of input and outputs 
-for each function. 
+All modules are added as entries in a regular dictionary and for each module, we wrap it inside a brick (here either `BrickTrainable` and 
+`BrickNotTrainable`), provide a name (dictionary key) and input and output names. The number of input and output names should match the 
+actually number of input and outputs for each function. 
 
-Each module is wrapped inside a brick - here either `BrickTrainable` and `BrickNotTrainable`.
-
-The `bricks`-dictionary describe how data is passed between bricks: The `preprocessor` uses a `raw` input tensor and passes the
+Input and output names specify how tensors move between bricks: The `preprocessor` uses a `raw` input tensor and passes the
 `processed` tensor to the `backbone`. The backbone returns the `embedding` tensor and passes it to the `head` determining 
 both `logits` and `softmaxed` tensors. 
 
-Bricks are then passed to a `BrickCollection` for executing bricks. The brick collection accepts a dictionary with required inputs and
-returns a dictionary with both intermediated and resulting tensors. 
+Bricks are passed to a `BrickCollection` for executing them as showed in below:
 
 ```python
-brick_collection = BrickCollection(bricks)
 batch_size=2
 batch_images = torch.rand((batch_size, 3, 100, 200))
 named_outputs = brick_collection(named_inputs={'raw': batch_images}, stage=Stage.INFERENCE)
-print(named_outputs.keys())
+print("Brick outputs:", named_outputs.keys())
+# Brick outputs: dict_keys(['raw', 'stage', 'processed', 'embedding', 'logits', 'softmaxed'])
 ```
+
+The brick collection accepts a dictionary and returns a dictionary with both intermediated and resulting tensors. 
 
 Running our models as a brick collection has the following advantages:
 
@@ -133,6 +139,14 @@ bricks = {
                       alive_stages=[Stage.TRAIN, Stage.VALIDATION, Stage.TEST], loss_output_names="all")
 }
 brick_collection = BrickCollection(bricks)
+
+print(brick_collection)
+# BrickCollection(
+#   (preprocessor): BrickNotTrainable(PreprocessorDummy, input_names=['raw'], output_names=['processed'], alive_stages=['TRAIN', 'VALIDATION', 'TEST', 'INFERENCE', 'EXPORT'])
+#   (backbone): BrickTrainable(TinyModel, input_names=['processed'], output_names=['embedding'], alive_stages=['TRAIN', 'VALIDATION', 'TEST', 'INFERENCE', 'EXPORT'])
+#   (head): BrickTrainable(ClassifierDummy, input_names=['embedding'], output_names=['logits', 'softmaxed'], alive_stages=['TRAIN', 'VALIDATION', 'TEST', 'INFERENCE', 'EXPORT'])
+#   (loss): BrickLoss(CrossEntropyLoss, input_names=['logits', 'targets'], output_names=['loss_ce'], alive_stages=['TRAIN', 'VALIDATION', 'TEST'])
+# )
 ```
 
 We set `preprocessor`, `backbone` and `head` to be alive on all stages `alive_stages="all"` - this is the default behavior and
@@ -266,7 +280,7 @@ export_bricks_as_onnx(path_onnx=path_onnx,
 ```
 
 ### Brick features: Act as a nn.Module
-A brick collection acts as a 'nn.Module' mean we can do the following: 
+A brick collection acts as a 'nn.Module' meaning:
 
 ```python
 # Move to specify device (CPU/GPU) or precision to automatically move model parameters
@@ -282,11 +296,54 @@ brick_collection_half.load_state_dict(torch.load(path_model))
 
 # Access parameters
 brick_collection_half.named_parameters()
+
+# Using compile with pytorch >= 2.0
+torch.compile(brick_collection)
 ```
 
+### Brick features: Act as a dictionary (nn.ModuleDict)
 
 
 
+```python
+from typing import Dict
+
+from torchbricks.bricks import BrickInterface
+
+
+def image_classifier_head(num_classes: int, in_channels: int) -> Dict[str, BrickInterface]:
+    """Image classifier bricks: Classifier, loss and metrics """
+    head = {
+        'classify': BrickTrainable(ImageClassifier(num_classes=num_classes, n_features=in_channels),
+                                   input_names=['features'], output_names=['./logits', './probabilities', './class_prediction']),
+        'accuracy': BrickMetricSingle(MulticlassAccuracy(num_classes=num_classes), input_names=['./class_prediction', 'targets']),
+        'loss': BrickLoss(model=nn.CrossEntropyLoss(), input_names=['./logits', 'targets'], output_names=['./loss_ce'])
+    }
+    return head
+
+
+bricks = {
+    'preprocessor': BrickNotTrainable(Preprocessor(), input_names=['raw'], output_names=['normalized']),
+    'backbone': resnet_brick,
+    'head0': image_classifier_head(num_classes=3, in_channels=resnet_brick.model.n_backbone_features),
+    'head1': image_classifier_head(num_classes=5, in_channels=resnet_brick.model.n_backbone_features),
+}
+print(BrickCollection(bricks))
+# BrickCollection(
+#   (preprocessor): BrickNotTrainable(Preprocessor, input_names=['raw'], output_names=['normalized'], alive_stages=['TRAIN', 'VALIDATION', 'TEST', 'INFERENCE', 'EXPORT'])
+#   (backbone): BrickTrainable(BackboneResnet, input_names=['normalized'], output_names=['features'], alive_stages=['TRAIN', 'VALIDATION', 'TEST', 'INFERENCE', 'EXPORT'])
+#   (head0): BrickCollection(
+#     (classify): BrickTrainable(ImageClassifier, input_names=['features'], output_names=['head0/logits', 'head0/probabilities', 'head0/class_prediction'], alive_stages=['TRAIN', 'VALIDATION', 'TEST', 'INFERENCE', 'EXPORT'])
+#     (accuracy): BrickMetricSingle(['MulticlassAccuracy'], input_names=['head0/class_prediction', 'targets'], output_names=[], alive_stages=['TRAIN', 'TEST', 'VALIDATION'])
+#     (loss): BrickLoss(CrossEntropyLoss, input_names=['head0/logits', 'targets'], output_names=['head0/loss_ce'], alive_stages=['TRAIN', 'TEST', 'VALIDATION'])
+#   )
+#   (head1): BrickCollection(
+#     (classify): BrickTrainable(ImageClassifier, input_names=['features'], output_names=['head1/logits', 'head1/probabilities', 'head1/class_prediction'], alive_stages=['TRAIN', 'VALIDATION', 'TEST', 'INFERENCE', 'EXPORT'])
+#     (accuracy): BrickMetricSingle(['MulticlassAccuracy'], input_names=['head1/class_prediction', 'targets'], output_names=[], alive_stages=['TRAIN', 'TEST', 'VALIDATION'])
+#     (loss): BrickLoss(CrossEntropyLoss, input_names=['head1/logits', 'targets'], output_names=['head1/loss_ce'], alive_stages=['TRAIN', 'TEST', 'VALIDATION'])
+#   )
+# )
+```
 
 ### Bag of bricks - reusable bricks modules
 Note also in above example we use bag-of-bricks to import commonly used `nn.Module`s 
@@ -386,6 +443,8 @@ MISSING
 - [x] Allow a brick to receive all named_inputs and add a test for it.
 - [x] Fix the release process. It should be as simple as running `make release`.
 - [x] Add onnx export example to the README.md
+- [ ] Pretty print bricks
+- [ ] Relative input/output names
 - [ ] Make DAG like functionality to check if a inputs and outputs works for all model stages.
 - [ ] Use pymy, pyright or pyre to do static code checks. 
 - [ ] Decide: Add stage as an internal state and not in the forward pass:

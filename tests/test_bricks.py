@@ -6,7 +6,7 @@ import torch
 import torchmetrics
 from torch import nn
 from torchbricks import bricks, custom_metrics
-from torchbricks.bricks import BrickCollection, BrickLoss, BrickMetrics, BrickMetricSingle, Stage
+from torchbricks.bricks import BrickCollection, BrickLoss, BrickMetrics, BrickMetricSingle, BrickModule, Stage
 from torchmetrics.classification import MulticlassAccuracy
 from utils_testing.utils_testing import assert_equal_dictionaries, create_brick_collection
 
@@ -16,9 +16,11 @@ def test_brick_collection():
     brick_collection = create_brick_collection(num_classes=num_classes, num_backbone_featues=5)
     expected_forward_named_outputs = {'labels', 'raw', 'stage', 'preprocessed', 'features', 'predictions'}
     expected_named_losses = {'ce_loss'}
-    expected_named_metrics = set(brick_collection['metrics'].metrics[Stage.TRAIN.name])
+    expected_named_metrics = set(brick_collection['head']['metrics'].metrics[Stage.TRAIN.name])
 
     model = bricks.BrickCollection(bricks=brick_collection)
+
+
     named_inputs = {'labels': torch.tensor(range(num_classes), dtype=torch.float64), 'raw': torch.zeros((3, 24, 24))}
 
     named_outputs = model(stage=Stage.TRAIN, named_inputs=named_inputs)
@@ -37,7 +39,7 @@ def test_brick_collection_no_metrics():
     expected_named_metrics = {}
 
     brick_collection = create_brick_collection(num_classes=num_classes, num_backbone_featues=5)
-    brick_collection = {name: brick for name, brick in brick_collection.items() if not isinstance(brick, bricks.BrickMetrics)}
+    brick_collection['head'].pop('metrics')
     model = bricks.BrickCollection(bricks=brick_collection)
 
     named_inputs = {'labels': torch.tensor(range(num_classes), dtype=torch.float64), 'raw': torch.zeros((3, 24, 24))}
@@ -60,8 +62,8 @@ def test_brick_collection_no_metrics_no_losses():
     expected_named_metrics = {}
 
     brick_collection = create_brick_collection(num_classes=num_classes, num_backbone_featues=5)
-    brick_collection = {name: brick for name, brick in brick_collection.items() if not isinstance(brick, bricks.BrickMetrics)}
-    brick_collection = {name: brick for name, brick in brick_collection.items() if not isinstance(brick, bricks.BrickLoss)}
+    brick_collection['head'].pop('metrics')
+    brick_collection['head'].pop('loss')
     model = bricks.BrickCollection(bricks=brick_collection)
 
     named_inputs = {'labels': torch.tensor(range(num_classes), dtype=torch.float64), 'raw': torch.zeros((3, 24, 24))}
@@ -149,6 +151,7 @@ def test_brick_torch_metric_single_metric(metric_name: Optional[str]):
     }
 
     model = BrickCollection(bricks)
+
     batch_logits = torch.rand((1, num_classes))
     stage = Stage.TRAIN
     named_inputs = {'logits': batch_logits, 'targets': torch.ones((1), dtype=torch.int64)}
@@ -159,6 +162,15 @@ def test_brick_torch_metric_single_metric(metric_name: Optional[str]):
     assert list(metrics) == [expected_metric_name]
 
 
+expected_str='''BrickCollection(
+  (preprocessor): BrickNotTrainable(Preprocessor, input_names=['raw'], output_names=['preprocessed'], alive_stages=['TRAIN', 'VALIDATION', 'TEST', 'INFERENCE', 'EXPORT'])
+  (backbone): BrickTrainable(TinyBackbone, input_names=['preprocessed'], output_names=['features'], alive_stages=['TRAIN', 'VALIDATION', 'TEST', 'INFERENCE', 'EXPORT'])
+  (head): BrickCollection(
+    (classifier): BrickTrainable(Classifier, input_names=['features'], output_names=['predictions'], alive_stages=['TRAIN', 'VALIDATION', 'TEST', 'INFERENCE', 'EXPORT'])
+    (loss): BrickLoss(CrossEntropyLoss, input_names=['predictions', 'labels'], output_names=['ce_loss'], alive_stages=['TRAIN', 'TEST', 'VALIDATION'])
+    (metrics): BrickMetrics(['Accuracy', 'Concatenate', 'ConfMat', 'MeanAccuracy'], input_names=['predictions', 'labels'], output_names=[], alive_stages=['TRAIN', 'TEST', 'VALIDATION'])
+  )
+)''' # noqa: E501
 @pytest.mark.parametrize('return_metrics', [False, True])
 def test_brick_torch_metric_multiple_metric(return_metrics: bool):
     num_classes = 5
@@ -188,6 +200,60 @@ def test_brick_torch_metric_multiple_metric(return_metrics: bool):
     metrics = model.summarize(stage=stage, reset=True)
     expected_metrics = set(metric_collection)
     assert set(metrics) == expected_metrics
+
+def test_brick_collection_print():
+    num_classes = 10
+    bricks = create_brick_collection(num_classes=num_classes, num_backbone_featues=5)
+    model = BrickCollection(bricks)
+    assert model.__str__() == expected_str
+
+
+def test_resolve_relative_names():
+    bricks = {
+        'preprocessor': BrickModule(model=nn.Identity(), input_names=['raw'], output_names=['processed']),
+        'backbone': BrickModule(model=nn.Identity(), input_names=['processed'], output_names=['embeddings']),
+        'head0': {
+            'classifier': BrickModule(model=nn.Identity(), input_names=['../embeddings'], output_names=['./predictions']),
+            'loss': BrickModule(model=nn.Identity(), input_names=['./predictions'], output_names=['./loss']),
+        },
+        'head1': {
+            'classifier': BrickModule(model=nn.Identity(), input_names=['embeddings'], output_names=['./predictions']),
+            'loss': BrickModule(model=nn.Identity(), input_names=['./predictions'], output_names=['./loss']),
+            'head1_nested':{
+                'classifier': BrickModule(model=nn.Identity(), input_names=['../../embeddings',
+                                                                            '../predictions',
+                                                                            '../../head0/predictions'],
+                                          output_names=['./predictions']),
+                'loss': BrickModule(model=nn.Identity(), input_names=['./predictions'], output_names=['./loss']),
+            }
+        }
+    }
+
+    model = BrickCollection(bricks)
+    assert model['head0']['classifier'].input_names == ['embeddings']
+    assert model['head0']['classifier'].output_names == ['head0/predictions']
+    assert model['head0']['loss'].input_names == ['head0/predictions']
+    assert model['head0']['loss'].output_names == ['head0/loss']
+
+    assert model['head1']['head1_nested']['classifier'].input_names == ['embeddings', 'head1/predictions', 'head0/predictions']
+    assert model['head1']['head1_nested']['classifier'].output_names == ['head1/head1_nested/predictions']
+
+    assert model['head1']['head1_nested']['loss'].input_names == ['head1/head1_nested/predictions']
+    assert model['head1']['head1_nested']['loss'].output_names == ['head1/head1_nested/loss']
+
+
+def test_resolve_relative_names_errors():
+    bricks = {
+        'preprocessor': BrickModule(model=nn.Identity(), input_names=['raw'], output_names=['processed']),
+        'backbone': BrickModule(model=nn.Identity(), input_names=['processed'], output_names=['embeddings']),
+        'head0': {
+            'classifier': BrickModule(model=nn.Identity(), input_names=['../../embeddings'], output_names=['./predictions']),
+            'loss': BrickModule(model=nn.Identity(), input_names=['./predictions'], output_names=['./loss']),
+        },
+    }
+    with pytest.raises(ValueError, match='Failed to resolve input name. Unable to resolve'):
+        BrickCollection(bricks)
+
 
 def test_save_and_load_of_brick_collection(tmp_path: Path):
     brick_collection = create_brick_collection(num_classes=3, num_backbone_featues=10)
