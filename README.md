@@ -86,15 +86,39 @@ print(brick_collection)
 # )
 ```
 
+<!-- #region -->
 All modules are added as entries in a regular dictionary and for each module, we wrap it inside a brick (here either `BrickTrainable` and 
 `BrickNotTrainable`), provide a name (dictionary key) and input and output names. The number of input and output names should match the 
 actually number of input and outputs for each function. 
+
+
+More structured
+
+
+```mermaid
+graph LR
+    raw:::arrow --> preprocessor["BrickNotTrainable<br>PreprocessorDummy"] --- processed:::arrow
+    processed:::arrow --> backbone["BrickTrainable<br>TinyModel"] --- embedding:::arrow
+    embedding:::arrow --> head["BrickTrainable<br>ClassifierDummy"] --> logits:::arrow
+    head --> softmaxed:::arrow
+
+    classDef arrow stroke-width:0px,fill-opacity:0.3
+```
+
 
 Input and output names specify how tensors move between bricks: The `preprocessor` uses a `raw` input tensor and passes the
 `processed` tensor to the `backbone`. The backbone returns the `embedding` tensor and passes it to the `head` determining 
 both `logits` and `softmaxed` tensors. 
 
 Bricks are passed to a `BrickCollection` for executing them as showed in below:
+<!-- #endregion -->
+
+```mermaid
+graph LR
+    raw --> preprocessor["BrickNotTrainable<br>PreprocessorDummy"]
+    preprocessor -- processed --> backbone["BrickTrainable<br>TinyModel"]
+    backbone -- embedding --> head["BrickTrainable<br>ClassifierDummy"] --> logits & softmaxed
+```
 
 ```python
 batch_size=2
@@ -359,21 +383,90 @@ bricks = {
     'head1': image_classifier_head(num_classes=5, in_channels=n_features, input_name='features'),
 }
 print(BrickCollection(bricks))
-# BrickCollection(
-#   (preprocessor): BrickNotTrainable(Preprocessor, input_names=['raw'], output_names=['normalized'], alive_stages=['TRAIN', 'VALIDATION', 'TEST', 'INFERENCE', 'EXPORT'])
-#   (backbone): BrickTrainable(BackboneResnet, input_names=['normalized'], output_names=['features'], alive_stages=['TRAIN', 'VALIDATION', 'TEST', 'INFERENCE', 'EXPORT'])
-#   (head0): BrickCollection(
-#     (classify): BrickTrainable(ImageClassifier, input_names=['features'], output_names=['head0/logits', 'head0/probabilities', 'head0/class_prediction'], alive_stages=['TRAIN', 'VALIDATION', 'TEST', 'INFERENCE', 'EXPORT'])
-#     (accuracy): BrickMetricSingle(['MulticlassAccuracy'], input_names=['head0/class_prediction', 'targets'], output_names=[], alive_stages=['TRAIN', 'TEST', 'VALIDATION'])
-#     (loss): BrickLoss(CrossEntropyLoss, input_names=['head0/logits', 'targets'], output_names=['head0/loss_ce'], alive_stages=['TRAIN', 'TEST', 'VALIDATION'])
-#   )
-#   (head1): BrickCollection(
-#     (classify): BrickTrainable(ImageClassifier, input_names=['features'], output_names=['head1/logits', 'head1/probabilities', 'head1/class_prediction'], alive_stages=['TRAIN', 'VALIDATION', 'TEST', 'INFERENCE', 'EXPORT'])
-#     (accuracy): BrickMetricSingle(['MulticlassAccuracy'], input_names=['head1/class_prediction', 'targets'], output_names=[], alive_stages=['TRAIN', 'TEST', 'VALIDATION'])
-#     (loss): BrickLoss(CrossEntropyLoss, input_names=['head1/logits', 'targets'], output_names=['head1/loss_ce'], alive_stages=['TRAIN', 'TEST', 'VALIDATION'])
-#   )
-# )
 ```
+
+Structured view
+```mermaid
+flowchart LR
+    
+    targets --> head0/loss & head0/classifier & head1/loss & head1/classifier
+    raw --> preprocessor["`**BrickNotTrainable**
+    Preprocessor()`"]
+    
+    preprocessor --- normalized:::arrow-->backbone["`**BrickTrainable**
+    ResNet()`"] --- features:::arrow --> head0/classifier & head1/classifier
+
+    subgraph head0
+        head0/classifier[" <strong>BrickTrainable</strong><br>ImageClassifier()"] --- head0/logits & head0/probabilities & head0/class_prediction
+        head0/class_prediction --- head0/accuracy["`**BrickMetricSingle**
+        MulticlassAccuracy`"]
+        head0/logits --- head0/loss["`**BrickLoss**
+        nn.CrossEntropyLoss`"] --> head0/loss_ce
+    end
+    subgraph head1
+        head1/classifier["`**BrickTrainable**
+        ImageClassifier()`"] --- head1/logits & head1/probabilities & head1/class_prediction
+        head1/class_prediction --- head1/accuracy["`**BrickMetricSingle**
+        MulticlassAccuracy`"]
+        head1/logits --- head1/loss["`**BrickLoss**
+        nn.CrossEntropyLoss`"] --> head1/loss_ce
+    end
+    %% style a_features stroke-width:0px
+    classDef arrow stroke-width:0px,fill-opacity:0.3
+``````
+
+
+Compact view 
+```mermaid
+flowchart LR
+
+    preprocessor["`**BrickNotTrainable**
+    Preprocessor()`"] 
+
+    backbone["`**BrickTrainable**
+    ResNet()`"] 
+    
+    head0/classifier["`**BrickTrainable**
+        ImageClassifier()`"]
+    head0/accuracy["`**BrickMetricSingle**
+        MulticlassAccuracy`"]
+    head0/loss["`**BrickLoss**
+        nn.CrossEntropyLoss`"]
+    
+    head1/classifier["`**BrickTrainable**
+        ImageClassifier()`"]
+    head1/accuracy["`**BrickMetricSingle**
+        MulticlassAccuracy`"]
+    head1/loss["`**BrickLoss**
+        nn.CrossEntropyLoss`"]
+
+    %% Inputs %%
+    targets --> head0/loss & head0/classifier & head1/loss & head1/classifier
+    raw --> preprocessor
+    %% inputs -- targets --> head0/loss & head0/classifier & head1/loss & head1/classifier
+    %% inputs -- raw --> preprocessor
+
+    %% Preprocessor: Connected to
+    preprocessor -- normalized -->backbone
+    
+    %% backbone: Connected to
+    backbone -- features --> head0/classifier & head1/classifier
+
+    subgraph head0
+        head0/classifier -- head0/class_prediction --> head0/accuracy
+        head0/classifier --> head0/probabilities
+        head0/classifier -- head0/logits --> head0/loss
+        head0/loss --> head0/loss_ce
+        
+    end
+    subgraph head1
+        head1/classifier -- head1/class_prediction --> head1/accuracy
+        head1/classifier --> head1/probabilities
+        head1/classifier -- head1/logits --> head1/loss
+        head1/loss --> head1/loss_ce
+    end    
+``````
+
 
 ### Bag of bricks - reusable bricks modules
 Note also in above example we use bag-of-bricks to import commonly used `nn.Module`s 
