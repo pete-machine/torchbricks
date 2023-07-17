@@ -428,6 +428,25 @@ trainer.test(bricks_lightning_module, datamodule=data_module)
 
 
 
+Is mermaid rendered in GITHUB? 
+```mermaid
+flowchart LR
+    c1-->a2
+    subgraph one
+    a1-->a2
+    end
+    subgraph two
+    b1-->b2
+    end
+    subgraph three
+    c1-->c2
+    end
+    one --> two
+    three --> two
+    two --> c2
+``````
+
+
 
 ## TorchMetric.MetricCollection
 
@@ -477,6 +496,7 @@ MISSING
 - [x] Relative input/output names
 - [x] Test to verify that environment matches conda lock. The make command 'update-lock-file' should store a copy of 'environment.yml'
       We will the have a test checking if the copy and the current version of `environment.yml` is the same.
+- [ ] Create brick-collection visualization tool ("mermaid?")
 - [ ] Make DAG like functionality to check if a inputs and outputs works for all model stages.
 - [ ] Use pymy, pyright or pyre to do static code checks. 
 - [ ] Decide: Add stage as an internal state and not in the forward pass:
