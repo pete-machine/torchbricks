@@ -308,24 +308,24 @@ A brick collection acts as a 'nn.Module' meaning:
 
 ```python
 # Move to specify device (CPU/GPU) or precision to automatically move model parameters
-brick_collection_half = brick_collection.to(torch.float16)
-
+brick_collection.to(torch.float16)
+brick_collection.to(torch.float32)
 
 # Save model parameters
 path_model = Path("build/readme_model.pt")
-torch.save(brick_collection_half.state_dict(), path_model)
+torch.save(brick_collection.state_dict(), path_model)
 
 # Load model parameters
-brick_collection_half.load_state_dict(torch.load(path_model))
+brick_collection.load_state_dict(torch.load(path_model))
 
 # Access parameters
-brick_collection_half.named_parameters()
+brick_collection.named_parameters()
 
 # Using compile with pytorch >= 2.0
 torch.compile(brick_collection)
 ```
 
-### Brick features: Act as a dictionary (nn.ModuleDict)
+### Brick features: Act as a dictionary (nn.ModuleDict) and relative input/output names
 
 
 
@@ -419,7 +419,7 @@ bricks_lightning_module = LightningBrickCollection(path_experiments=Path("build"
                                                    brick_collection=brick_collection,
                                                    create_optimizers_func=create_opimtizer_func)
 
-trainer = pl.Trainer(accelerator="cpu", max_epochs=1, limit_train_batches=2, limit_val_batches=2, limit_test_batches=2)
+trainer = pl.Trainer(max_epochs=1, limit_train_batches=2, limit_val_batches=2, limit_test_batches=2)
 # To train and test model
 trainer.fit(bricks_lightning_module, datamodule=data_module)
 trainer.test(bricks_lightning_module, datamodule=data_module)
@@ -475,7 +475,7 @@ MISSING
 - [x] Add onnx export example to the README.md
 - [x] Pretty print bricks
 - [x] Relative input/output names
-- [ ] Test to verify that environment matches conda lock. The make command 'update-lock-file' should store a copy of 'environment.yml'
+- [x] Test to verify that environment matches conda lock. The make command 'update-lock-file' should store a copy of 'environment.yml'
       We will the have a test checking if the copy and the current version of `environment.yml` is the same.
 - [ ] Make DAG like functionality to check if a inputs and outputs works for all model stages.
 - [ ] Use pymy, pyright or pyre to do static code checks. 

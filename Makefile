@@ -25,7 +25,10 @@ install:                 ## create environment using lock-file
 
 .PHONY: update-lock-file
 update-lock-file:        ## Update lock file using the specification in 'environment.yml'
+	@set -e
 	conda-lock -k explicit --conda mamba -f environment.yml
+	cp environment.yml tests/data/copy_lock_filed_environment.yml
+
 
 .PHONY: update
 update: update-lock-file install ## Update lock file using the specification in 'environment.yml'
