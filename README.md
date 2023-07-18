@@ -397,7 +397,7 @@ flowchart LR
     ResNet()`"] --- features:::arrow --> head0/classifier & head1/classifier
 
     subgraph head0
-        head0/classifier[" <strong>BrickTrainable</strong><br>ImageClassifier()"] --- head0/logits & head0/probabilities & head0/class_prediction
+        head0/classifier["<strong>BrickTrainable</strong><br>ImageClassifier()"] --- head0/logits & head0/probabilities & head0/class_prediction
         head0/class_prediction --- head0/accuracy["`**BrickMetricSingle**
         MulticlassAccuracy`"]
         head0/logits --- head0/loss["`**BrickLoss**

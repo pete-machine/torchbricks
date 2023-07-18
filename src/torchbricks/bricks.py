@@ -22,9 +22,7 @@ class BrickInterface(ABC):
     def __init__(self,
                  input_names: Union[List[str], Dict[str, str], str],
                  output_names: List[str],
-                 alive_stages: Union[List[Stage], str],
-                 wrapped_module_name: str,
-                 ) -> None:
+                 alive_stages: Union[List[Stage], str]) -> None:
         super().__init__()
         if isinstance(input_names, str):
             if input_names != 'all':
@@ -32,7 +30,6 @@ class BrickInterface(ABC):
         self.input_names = input_names
         self.output_names = output_names
         self.alive_stages: List[Stage] = parse_argument_alive_stages(alive_stages)
-        self.wrapped_module_name = wrapped_module_name
 
     def run_now(self, stage: Stage) -> bool:
         return stage in self.alive_stages
@@ -49,11 +46,19 @@ class BrickInterface(ABC):
     def summarize(self, stage: Stage, reset: bool) -> Dict[str, Any]:
         """"""
 
+    @abstractmethod
+    def get_module_name(self) -> str:
+        """"""
+
+    def get_brick_type(self) -> str:
+        return self.__class__.__name__
+
+
     def __repr__(self) -> str:
         input_names = self.input_names
         output_names = self.output_names
         alive_stages = [phase.name for phase in self.alive_stages]
-        return f'{self.__class__.__name__}({self.wrapped_module_name}, {input_names=}, {output_names=}, {alive_stages=})'
+        return f'{self.get_brick_type()}({self.get_module_name()}, {input_names=}, {output_names=}, {alive_stages=})'
 
 
 
@@ -95,8 +100,7 @@ class BrickModule(nn.Module, BrickInterface):
         BrickInterface.__init__(self,
                                 input_names=input_names,
                                 output_names=output_names,
-                                alive_stages=alive_stages,
-                                wrapped_module_name=model.__class__.__name__)
+                                alive_stages=alive_stages)
         self.model = model
         self.loss_output_names = parse_argument_loss_output_names(loss_output_names, available_output_names=output_names)
 
@@ -126,6 +130,9 @@ class BrickModule(nn.Module, BrickInterface):
 
     def summarize(self, stage: Stage, reset: bool) -> Dict[str, Any]:
         return {}
+
+    def get_module_name(self) -> str:
+        return self.model.__class__.__name__
 
     def __repr__(self):  # Overwrite '__repr__' of 'BrickModule'
         return BrickInterface.__repr__(self)
@@ -277,13 +284,12 @@ class BrickMetrics(BrickInterface, nn.Module):
         BrickInterface.__init__(self,
                                 input_names=input_names,
                                 output_names=output_names,
-                                alive_stages=alive_stages,
-                                wrapped_module_name=f'{list(metric_collection)}')
+                                alive_stages=alive_stages)
         nn.Module.__init__(self)
 
         if isinstance(metric_collection, dict):
             metric_collection = MetricCollection(metric_collection)
-
+        self.name = f'{list(metric_collection)}'
         self.return_metrics = return_metrics
         self.metrics = nn.ModuleDict({stage.name: metric_collection.clone() for stage in alive_stages})
 
@@ -317,6 +323,9 @@ class BrickMetrics(BrickInterface, nn.Module):
             metric_collection.reset()
 
         return metrics
+
+    def get_module_name(self) -> str:
+        return self.name
 
 @typechecked
 class BrickMetricSingle(BrickMetrics):
