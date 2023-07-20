@@ -4,7 +4,7 @@ from typing import Dict
 from torch import nn
 from torchbricks.bag_of_bricks import ImageClassifier, Preprocessor
 from torchbricks.bricks import BrickCollection, BrickInterface, BrickLoss, BrickMetricSingle, BrickNotTrainable, BrickTrainable
-from torchbricks.graph_builder import create_mermaid_dag_graph
+from torchbricks.graph_plotter import create_mermaid_dag_graph
 from torchmetrics.classification import MulticlassAccuracy
 
 

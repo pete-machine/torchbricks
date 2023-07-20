@@ -60,11 +60,14 @@ class ClassifierDummy(nn.Module):
 
 
 ## Concept 1: Bricks are connected
-Using input and output names, we specify how modules are connected.
+Using input and output names, we specify how modules are connected with a regular dictionary. Each module is wrapped inside a brick 
+(here either `BrickTrainable` and `BrickNotTrainable`) and input and output names. 
+The number of input and output names should match the actually number of input and outputs for each function. 
 
 ```python
 from torchbricks.bricks import BrickCollection, BrickTrainable, BrickNotTrainable, BrickLoss
 from torchbricks.bricks import Stage
+from torchbricks.graph_plotter import create_mermaid_dag_graph
 
 bricks = {
     'preprocessor': BrickNotTrainable(PreprocessorDummy(), 
@@ -79,46 +82,50 @@ bricks = {
 }
 brick_collection = BrickCollection(bricks)
 print(brick_collection)
-# BrickCollection(
-#   (preprocessor): BrickNotTrainable(PreprocessorDummy, input_names=['raw'], output_names=['processed'], alive_stages=['TRAIN', 'VALIDATION', 'TEST', 'INFERENCE', 'EXPORT'])
-#   (backbone): BrickTrainable(TinyModel, input_names=['processed'], output_names=['embedding'], alive_stages=['TRAIN', 'VALIDATION', 'TEST', 'INFERENCE', 'EXPORT'])
-#   (head): BrickTrainable(ClassifierDummy, input_names=['embedding'], output_names=['logits', 'softmaxed'], alive_stages=['TRAIN', 'VALIDATION', 'TEST', 'INFERENCE', 'EXPORT'])
-# )
 ```
 
-<!-- #region -->
-All modules are added as entries in a regular dictionary and for each module, we wrap it inside a brick (here either `BrickTrainable` and 
-`BrickNotTrainable`), provide a name (dictionary key) and input and output names. The number of input and output names should match the 
-actually number of input and outputs for each function. 
-
-
-More structured
+The brick collection is visualized below. Showing how tensors are passed between bricks used in the 
+specified input and output names. 
 
 
 ```mermaid
-graph LR
-    raw:::arrow --> preprocessor["BrickNotTrainable<br>PreprocessorDummy"] --- processed:::arrow
-    processed:::arrow --> backbone["BrickTrainable<br>TinyModel"] --- embedding:::arrow
-    embedding:::arrow --> head["BrickTrainable<br>ClassifierDummy"] --> logits:::arrow
-    head --> softmaxed:::arrow
-
-    classDef arrow stroke-width:0px,fill-opacity:0.3
+flowchart LR
+    %% Brick definitions
+    preprocessor("<strong>BrickNotTrainable</strong><br><strong>preprocessor</strong>: PreprocessorDummy"):::BrickNotTrainable
+    backbone("<strong>BrickTrainable</strong><br><strong>backbone</strong>: TinyModel"):::BrickTrainable
+    head("<strong>BrickTrainable</strong><br><strong>head</strong>: ClassifierDummy"):::BrickTrainable
+    
+    %% Draw input and outputs
+    raw:::input --> preprocessor
+    
+    %% Draw nodes and edges
+    preprocessor --> |processed| backbone
+    backbone --> |embedding| head
+    head --> softmaxed:::output
+    head --> logits:::output
+    
+    %% Add styling
+    classDef arrow stroke-width:0px,fill-opacity:0.0 
+    classDef input stroke-width:0px,fill-opacity:0.3,fill:#22A699 
+    classDef output stroke-width:0px,fill-opacity:0.3,fill:#F2BE22 
+    classDef BrickNotTrainable stroke-width:0px,fill:#B56576 
+    classDef BrickTrainable stroke-width:0px,fill:#6D597A 
+    
+    %% Add legends
+    subgraph Legends
+        input(input):::input
+        output(output):::output
+    end
 ```
+*Graph is visualized using [mermaid](https://github.com/mermaid-js/mermaid) syntax.*
+*We provide the `create_mermaid_dag_graph`-function to visualize brick collection in a markdown*
 
 
-Input and output names specify how tensors move between bricks: The `preprocessor` uses a `raw` input tensor and passes the
-`processed` tensor to the `backbone`. The backbone returns the `embedding` tensor and passes it to the `head` determining 
-both `logits` and `softmaxed` tensors. 
 
 Bricks are passed to a `BrickCollection` for executing them as showed in below:
-<!-- #endregion -->
 
-```mermaid
-graph LR
-    raw --> preprocessor["BrickNotTrainable<br>PreprocessorDummy"]
-    preprocessor -- processed --> backbone["BrickTrainable<br>TinyModel"]
-    backbone -- embedding --> head["BrickTrainable<br>ClassifierDummy"] --> logits & softmaxed
-```
+
+
 
 ```python
 batch_size=2
