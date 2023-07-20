@@ -84,7 +84,7 @@ brick_collection = BrickCollection(bricks)
 print(brick_collection)
 ```
 
-The brick collection is visualized below. Showing how tensors are passed between bricks used in the 
+The brick collection created above is visualized. Showing how tensors are passed between bricks used in the 
 specified input and output names. 
 
 
@@ -122,10 +122,7 @@ flowchart LR
 
 
 
-Bricks are passed to a `BrickCollection` for executing them as showed in below:
-
-
-
+The `BrickCollection` is used for executing above graph using a dictionary. 
 
 ```python
 batch_size=2
@@ -156,9 +153,11 @@ Leading us to the next section
 
 ## Concept 2: Bricks can be dead or alive
 The second concept is to specify when bricks are alive - meaning we specify at which stages (train, test, validation, inference and export) 
-a brick is executed. For other stage the brick will play dead - do nothing / return empty dictionary. 
+a brick is executed. 
 
-Meaning that for different `stages` of the model, we will have the option of creating a unique DAG for each model stage. 
+For other stage the brick will play dead - do nothing / return empty dictionary. 
+
+Meaning that for different `stages`, we will have the option of creating a unique DAG for each model stage. 
 
 In above example this is not particular interesting - because preprocessor, backbone model and head would typically be alive in all stages. 
 
@@ -193,17 +192,59 @@ print(brick_collection)
 #   (head): BrickTrainable(ClassifierDummy, input_names=['embedding'], output_names=['logits', 'softmaxed'], alive_stages=['TRAIN', 'VALIDATION', 'TEST', 'INFERENCE', 'EXPORT'])
 #   (loss): BrickLoss(CrossEntropyLoss, input_names=['logits', 'targets'], output_names=['loss_ce'], alive_stages=['TRAIN', 'VALIDATION', 'TEST'])
 # )
+print(create_mermaid_dag_graph(brick_collection))
 ```
 
 We set `preprocessor`, `backbone` and `head` to be alive on all stages `alive_stages="all"` - this is the default behavior and
 similar to before. 
-
+ 
 For `loss` we set `alive_stages=[Stage.TRAIN, Stage.VALIDATION, Stage.TEST]` to calculate loss during train, validation and test
 stages. 
+
+
+
+
+```mermaid
+flowchart LR
+    %% Brick definitions
+    preprocessor("<strong>BrickNotTrainable</strong><br><strong>preprocessor</strong>: PreprocessorDummy"):::BrickNotTrainable
+    backbone("<strong>BrickTrainable</strong><br><strong>backbone</strong>: TinyModel"):::BrickTrainable
+    head("<strong>BrickTrainable</strong><br><strong>head</strong>: ClassifierDummy"):::BrickTrainable
+    loss("<strong>BrickLoss</strong><br><strong>loss</strong>: CrossEntropyLoss"):::BrickLoss
+    
+    %% Draw input and outputs
+    raw:::input --> preprocessor
+    targets:::input --> loss
+    
+    %% Draw nodes and edges
+    preprocessor --> |processed| backbone
+    backbone --> |embedding| head
+    head --> |logits| loss
+    head --> softmaxed:::output
+    loss --> loss_ce:::output
+    
+    %% Add styling
+    classDef arrow stroke-width:0px,fill-opacity:0.0 
+    classDef input stroke-width:0px,fill-opacity:0.3,fill:#22A699 
+    classDef output stroke-width:0px,fill-opacity:0.3,fill:#F2BE22 
+    classDef BrickNotTrainable stroke-width:0px,fill:#B56576 
+    classDef BrickTrainable stroke-width:0px,fill:#6D597A 
+    classDef BrickLoss stroke-width:0px,fill:#5C677D 
+    
+    %% Add legends
+    subgraph Legends
+        input(input):::input
+        output(output):::output
+    end
+```
+
+<!-- #region -->
+
 
 Another advantages is that model have different input requirements for different stages.
 
 For `Stage.INFERENCE` and `Stage.EXPROT` stages, the model only requires the `raw` tensor as input. 
+<!-- #endregion -->
 
 ```python
 named_outputs_without_loss = brick_collection(named_inputs={'raw': batch_images}, 
@@ -389,90 +430,62 @@ bricks = {
     'head0': image_classifier_head(num_classes=3, in_channels=n_features, input_name='features'),
     'head1': image_classifier_head(num_classes=5, in_channels=n_features, input_name='features'),
 }
-print(BrickCollection(bricks))
+brick_collections = BrickCollection(bricks)
+print(brick_collections)
+print(create_mermaid_dag_graph(brick_collections))
 ```
 
-Structured view
 ```mermaid
 flowchart LR
+    %% Brick definitions
+    preprocessor("<strong>BrickNotTrainable</strong><br><strong>preprocessor</strong>: Preprocessor"):::BrickNotTrainable
+    backbone("<strong>BrickTrainable</strong><br><strong>backbone</strong>: BackboneResnet"):::BrickTrainable
+    head0/classify("<strong>BrickTrainable</strong><br><strong>head0/classify</strong>: ImageClassifier"):::BrickTrainable
+    head0/accuracy("<strong>BrickMetricSingle</strong><br><strong>head0/accuracy</strong>: ['MulticlassAccuracy']"):::BrickMetricSingle
+    head0/loss("<strong>BrickLoss</strong><br><strong>head0/loss</strong>: CrossEntropyLoss"):::BrickLoss
+    head1/classify("<strong>BrickTrainable</strong><br><strong>head1/classify</strong>: ImageClassifier"):::BrickTrainable
+    head1/accuracy("<strong>BrickMetricSingle</strong><br><strong>head1/accuracy</strong>: ['MulticlassAccuracy']"):::BrickMetricSingle
+    head1/loss("<strong>BrickLoss</strong><br><strong>head1/loss</strong>: CrossEntropyLoss"):::BrickLoss
     
-    targets --> head0/loss & head0/classifier & head1/loss & head1/classifier
-    raw --> preprocessor["`**BrickNotTrainable**
-    Preprocessor()`"]
+    %% Draw input and outputs
+    raw:::input --> preprocessor
+    targets:::input --> head0/accuracy
+    targets:::input --> head0/loss
+    targets:::input --> head1/accuracy
+    targets:::input --> head1/loss
     
-    preprocessor --- normalized:::arrow-->backbone["`**BrickTrainable**
-    ResNet()`"] --- features:::arrow --> head0/classifier & head1/classifier
-
+    %% Draw nodes and edges
+    preprocessor --> |normalized| backbone
+    backbone --> |features| head0/classify
+    backbone --> |features| head1/classify
     subgraph head0
-        head0/classifier["<strong>BrickTrainable</strong><br>ImageClassifier()"] --- head0/logits & head0/probabilities & head0/class_prediction
-        head0/class_prediction --- head0/accuracy["`**BrickMetricSingle**
-        MulticlassAccuracy`"]
-        head0/logits --- head0/loss["`**BrickLoss**
-        nn.CrossEntropyLoss`"] --> head0/loss_ce
+        head0/classify --> |head0/class_prediction| head0/accuracy
+        head0/classify --> |head0/logits| head0/loss
+        head0/classify --> head0/probabilities:::output
+        head0/loss --> head0/loss_ce:::output
     end
     subgraph head1
-        head1/classifier["`**BrickTrainable**
-        ImageClassifier()`"] --- head1/logits & head1/probabilities & head1/class_prediction
-        head1/class_prediction --- head1/accuracy["`**BrickMetricSingle**
-        MulticlassAccuracy`"]
-        head1/logits --- head1/loss["`**BrickLoss**
-        nn.CrossEntropyLoss`"] --> head1/loss_ce
+        head1/classify --> |head1/class_prediction| head1/accuracy
+        head1/classify --> |head1/logits| head1/loss
+        head1/classify --> head1/probabilities:::output
+        head1/loss --> head1/loss_ce:::output
     end
-    %% style a_features stroke-width:0px
-    classDef arrow stroke-width:0px,fill-opacity:0.3
-``````
-
-
-Compact view 
-```mermaid
-flowchart LR
-
-    preprocessor["`**BrickNotTrainable**
-    Preprocessor()`"] 
-
-    backbone["`**BrickTrainable**
-    ResNet()`"] 
     
-    head0/classifier["`**BrickTrainable**
-        ImageClassifier()`"]
-    head0/accuracy["`**BrickMetricSingle**
-        MulticlassAccuracy`"]
-    head0/loss["`**BrickLoss**
-        nn.CrossEntropyLoss`"]
+    %% Add styling
+    classDef arrow stroke-width:0px,fill-opacity:0.0 
+    classDef input stroke-width:0px,fill-opacity:0.3,fill:#22A699 
+    classDef output stroke-width:0px,fill-opacity:0.3,fill:#F2BE22 
+    classDef BrickNotTrainable stroke-width:0px,fill:#B56576 
+    classDef BrickTrainable stroke-width:0px,fill:#6D597A 
+    classDef BrickMetricSingle stroke-width:0px,fill:#023E7D 
+    classDef BrickLoss stroke-width:0px,fill:#5C677D 
     
-    head1/classifier["`**BrickTrainable**
-        ImageClassifier()`"]
-    head1/accuracy["`**BrickMetricSingle**
-        MulticlassAccuracy`"]
-    head1/loss["`**BrickLoss**
-        nn.CrossEntropyLoss`"]
-
-    %% Inputs %%
-    targets --> head0/loss & head0/classifier & head1/loss & head1/classifier
-    raw --> preprocessor
-    %% inputs -- targets --> head0/loss & head0/classifier & head1/loss & head1/classifier
-    %% inputs -- raw --> preprocessor
-
-    %% Preprocessor: Connected to
-    preprocessor -- normalized -->backbone
-    
-    %% backbone: Connected to
-    backbone -- features --> head0/classifier & head1/classifier
-
-    subgraph head0
-        head0/classifier -- head0/class_prediction --> head0/accuracy
-        head0/classifier --> head0/probabilities
-        head0/classifier -- head0/logits --> head0/loss
-        head0/loss --> head0/loss_ce
-        
+    %% Add legends
+    subgraph Legends
+        input(input):::input
+        output(output):::output
     end
-    subgraph head1
-        head1/classifier -- head1/class_prediction --> head1/accuracy
-        head1/classifier --> head1/probabilities
-        head1/classifier -- head1/logits --> head1/loss
-        head1/loss --> head1/loss_ce
-    end    
-``````
+```
 
 
 ### Bag of bricks - reusable bricks modules
@@ -526,25 +539,6 @@ trainer.test(bricks_lightning_module, datamodule=data_module)
 ```
 
 
-
-
-Is mermaid rendered in GITHUB? 
-```mermaid
-flowchart LR
-    c1-->a2
-    subgraph one
-    a1-->a2
-    end
-    subgraph two
-    b1-->b2
-    end
-    subgraph three
-    c1-->c2
-    end
-    one --> two
-    three --> two
-    two --> c2
-``````
 
 
 
