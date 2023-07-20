@@ -1,0 +1,36 @@
+name: torchbricks
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.10.*  # or don't specify the version and use the latest stable Python
+  - pytorch::pytorch=2.0.1  # A torchbrick package requirement
+  - torchmetrics=0.11.4     # A torchbrick package requirement
+  - onnx=1.14.0             # A torchbrick package requirement
+  - typeguard=3.0.2         # A torchbrick package requirement
+  - pytorch::torchvision=0.15.2
+  - pytorch::pytorch-cuda=11.7
+  - pytorch-lightning=2.0.2
+  # - deepdiff=6.3.0
+  - wandb=0.15.4
+  - nbmake=1.3.4
+  - nbconvert=7.6.0
+
+  # Linting stuff
+  - pre-commit=3.3.2
+  - coverage=7.2.5
+  - pytest=7.3.1
+  - pytest-cov=4.0.0
+  - beartype=0.14.1
+
+  # Build and release stuff
+  - bumpver
+  - build
+  - twine
+  - conda-lock
+
+# Non-standard section listing target platforms for conda-lock:
+platforms:
+  - linux-64
