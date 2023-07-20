@@ -18,7 +18,17 @@ class Stage(Enum):
     EXPORT = 'export'
 
 
+
+
+def use_default_style(overwrites: Optional[Dict[str, str]] = None):
+    overwrites = overwrites or {}
+    default_style = {'stroke-width': '0px'}
+    default_style.update(overwrites)
+    return default_style
+
 class BrickInterface(ABC):
+    # 67635c,f5e26b,f1dfca,db9d38,dc9097,c4779f,c75239,84bb84,394a89,7d9dc4
+    style: Dict[str, str] = use_default_style()
     def __init__(self,
                  input_names: Union[List[str], Dict[str, str], str],
                  output_names: List[str],
@@ -89,6 +99,7 @@ def parse_argument_loss_output_names(loss_output_names: Union[List[str], str], a
 
 @typechecked
 class BrickModule(nn.Module, BrickInterface):
+    style: Dict[str, str] = use_default_style({'fill' :'#355070'})
     def __init__(self, model: Union[nn.Module, nn.ModuleDict],
                  input_names: Union[List[str], Dict[str, str], str],
                  output_names: List[str],
@@ -219,6 +230,7 @@ def _resolve_input_or_output_names(input_or_output_names: List[str], parent: Pat
 
 @typechecked
 class BrickTrainable(BrickModule):
+    style: Dict[str, str] = use_default_style({'fill' :'#6D597A'})
     def __init__(self, model: nn.Module,
                  input_names: Union[List[str], Dict[str, str], str],
                  output_names: List[str],
@@ -234,6 +246,7 @@ class BrickTrainable(BrickModule):
 
 @typechecked
 class BrickNotTrainable(BrickModule):
+    style: Dict[str, str] = use_default_style({'fill' :'#B56576'})
     def __init__(self, model: nn.Module,
                  input_names: Union[List[str], Dict[str, str], str],
                  output_names: List[str],
@@ -250,6 +263,7 @@ class BrickNotTrainable(BrickModule):
 
 @typechecked
 class BrickLoss(BrickModule):
+    style: Dict[str, str] = use_default_style({'fill' :'#5C677D'})
     def __init__(self, model: nn.Module,
                  input_names: Union[List[str], Dict[str, str], str],
                  output_names: List[str],
@@ -269,6 +283,7 @@ class BrickLoss(BrickModule):
 
 @typechecked
 class BrickMetrics(BrickInterface, nn.Module):
+    style: Dict[str, str] = use_default_style({'fill' :'#023E7D'})
     def __init__(self, metric_collection: Union[MetricCollection,  Dict[str, Metric]],
                  input_names: Union[List[str], Dict[str, str], str],
                  alive_stages: Union[List[Stage], str, None] = None,

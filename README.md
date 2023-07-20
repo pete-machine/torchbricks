@@ -388,57 +388,109 @@ print(BrickCollection(bricks))
 Structured view
 ```mermaid
 flowchart LR
+    %% Define bricks
+    preprocessor["<strong>BrickNotTrainable</strong><br>Preprocessor"]
+    backbone["<strong>BrickTrainable</strong><br>BackboneResnet"]
+    head0/classifier["<strong>BrickTrainable</strong><br>ImageClassifier"]
+    head0/accuracy["<strong>BrickMetricSingle</strong><br>['MulticlassAccuracy']"]
+    head0/loss["<strong>BrickLoss</strong><br>CrossEntropyLoss"]
+    head1/classifier["<strong>BrickTrainable</strong><br>ImageClassifier"]
+    head1/accuracy["<strong>BrickMetricSingle</strong><br>['MulticlassAccuracy']"]
+    head1/loss["<strong>BrickLoss</strong><br>CrossEntropyLoss"]
+    features:::arrow
+    normalized:::arrow
+
+    %% Brick connections %%
+    raw --> preprocessor
+    targets --> head0/loss 
+    targets --> head0/classifier
+    targets --> head1/loss & head1/classifier
     
-    targets --> head0/loss & head0/classifier & head1/loss & head1/classifier
-    raw --> preprocessor["`**BrickNotTrainable**
-    Preprocessor()`"]
     
-    preprocessor --- normalized:::arrow-->backbone["`**BrickTrainable**
-    ResNet()`"] --- features:::arrow --> head0/classifier & head1/classifier
+    preprocessor --- normalized --> backbone 
+    backbone --- features --> head0/classifier & head1/classifier
 
     subgraph head0
-        head0/classifier["<strong>BrickTrainable</strong><br>ImageClassifier()"] --- head0/logits & head0/probabilities & head0/class_prediction
-        head0/class_prediction --- head0/accuracy["`**BrickMetricSingle**
-        MulticlassAccuracy`"]
-        head0/logits --- head0/loss["`**BrickLoss**
-        nn.CrossEntropyLoss`"] --> head0/loss_ce
+        head0/classifier --- head0/logits & head0/probabilities & head0/class_prediction
+        head0/class_prediction ---> head0/accuracy
+        head0/logits --> head0/loss --> head0/loss_ce
     end
     subgraph head1
-        head1/classifier["`**BrickTrainable**
-        ImageClassifier()`"] --- head1/logits & head1/probabilities & head1/class_prediction
-        head1/class_prediction --- head1/accuracy["`**BrickMetricSingle**
-        MulticlassAccuracy`"]
-        head1/logits --- head1/loss["`**BrickLoss**
-        nn.CrossEntropyLoss`"] --> head1/loss_ce
+        head1/classifier --- head1/logits & head1/probabilities & head1/class_prediction
+        head1/class_prediction --> head1/accuracy
+        head1/logits --> head1/loss --> head1/loss_ce
     end
+
+
+
     %% style a_features stroke-width:0px
     classDef arrow stroke-width:0px,fill-opacity:0.3
 ``````
 
+```mermaid
+flowchart LR
+    %% Brick definitions
+    preprocessor["<strong>preprocessor</strong><br>Preprocessor"]:::BrickNotTrainable
+    backbone["<strong>backbone</strong><br>BackboneResnet"]:::BrickTrainable
+    head0/classify["<strong>head0/classify</strong><br>ImageClassifier"]:::BrickTrainable
+    head0/accuracy["<strong>head0/accuracy</strong><br>['MulticlassAccuracy']"]:::BrickMetricSingle
+    head0/loss["<strong>head0/loss</strong><br>CrossEntropyLoss"]:::BrickLoss
+    head1/classify["<strong>head1/classify</strong><br>ImageClassifier"]:::BrickTrainable
+    head1/accuracy["<strong>head1/accuracy</strong><br>['MulticlassAccuracy']"]:::BrickMetricSingle
+    head1/loss["<strong>head1/loss</strong><br>CrossEntropyLoss"]:::BrickLoss
+    
+    %% Draw input and outputs
+    raw:::input --> preprocessor
+    targets:::input --> head0/accuracy
+    targets:::input --> head0/loss
+    targets:::input --> head1/accuracy
+    targets:::input --> head1/loss
+    preprocessor --> |normalized| backbone
+    backbone --> |features| head0/classify
+    backbone --> |features| head1/classify
+    subgraph head0[head0]
+        head0/classify --> |head0/class_prediction| head0/accuracy
+        head0/classify --> |head0/logits| head0/loss
+        head0/classify --> head0/probabilities:::output
+        head0/loss --> head0/loss_ce:::output
+    end
+    subgraph head1
+        head1/classify --> |head1/class_prediction| head1/accuracy
+        head1/classify --> |head1/logits| head1/loss
+        head1/classify --> head1/probabilities:::output
+        head1/loss --> head1/loss_ce:::output
+    end
+
+    classDef arrow stroke-width:0px,fill-opacity:0.0
+    classDef input  stroke-width:0px,fill-opacity:0.3,fill:#22A699
+    classDef output stroke-width:0px,fill-opacity:0.3,fill:#F2BE22
+    classDef BrickNotTrainable stroke-width:0px,fill:#B56576
+    classDef BrickTrainable stroke-width:0px,fill:#6D597A
+    classDef BrickMetricSingle stroke-width:0px,fill:#023E7D
+    classDef BrickLoss stroke-width:0px,fill:#5C677D
+
+    subgraph Legends
+        direction LR
+        BrickNotTrainable(BrickNotTrainable):::BrickNotTrainable
+        BrickTrainable(BrickTrainable):::BrickTrainable
+        BrickMetricSingle(BrickMetricSingle):::BrickMetricSingle
+        BrickLoss(BrickLoss):::BrickLoss
+    end
+```
 
 Compact view 
 ```mermaid
 flowchart LR
 
-    preprocessor["`**BrickNotTrainable**
-    Preprocessor()`"] 
-
-    backbone["`**BrickTrainable**
-    ResNet()`"] 
-    
-    head0/classifier["`**BrickTrainable**
-        ImageClassifier()`"]
-    head0/accuracy["`**BrickMetricSingle**
-        MulticlassAccuracy`"]
-    head0/loss["`**BrickLoss**
-        nn.CrossEntropyLoss`"]
-    
-    head1/classifier["`**BrickTrainable**
-        ImageClassifier()`"]
-    head1/accuracy["`**BrickMetricSingle**
-        MulticlassAccuracy`"]
-    head1/loss["`**BrickLoss**
-        nn.CrossEntropyLoss`"]
+    %% Define bricks
+    preprocessor["<strong>BrickNotTrainable</strong><br>Preprocessor"]
+    backbone["<strong>BrickTrainable</strong><br>BackboneResnet"]
+    head0/classifier["<strong>BrickTrainable</strong><br>ImageClassifier"]
+    head0/accuracy["<strong>BrickMetricSingle</strong><br>['MulticlassAccuracy']"]
+    head0/loss["<strong>BrickLoss</strong><br>CrossEntropyLoss"]
+    head1/classifier["<strong>BrickTrainable</strong><br>ImageClassifier"]
+    head1/accuracy["<strong>BrickMetricSingle</strong><br>['MulticlassAccuracy']"]
+    head1/loss["<strong>BrickLoss</strong><br>CrossEntropyLoss"]
 
     %% Inputs %%
     targets --> head0/loss & head0/classifier & head1/loss & head1/classifier
