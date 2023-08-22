@@ -505,7 +505,7 @@ flowchart LR
     classDef output stroke-width:0px,fill-opacity:0.3,fill:#F2BE22 
     classDef BrickNotTrainable stroke-width:0px,fill:#B56576 
     classDef BrickTrainable stroke-width:0px,fill:#6D597A 
-    classDef BrickMetricSingle stroke-width:0px,fill:#023E7D 
+    classDef BrickMetricSingle stroke-width:0px,fill:#1450A3 
     classDef BrickLoss stroke-width:0px,fill:#5C677D 
     
     %% Add legends

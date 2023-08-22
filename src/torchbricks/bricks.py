@@ -283,7 +283,7 @@ class BrickLoss(BrickModule):
 
 @typechecked
 class BrickMetrics(BrickInterface, nn.Module):
-    style: Dict[str, str] = use_default_style({'fill' :'#023E7D'})
+    style: Dict[str, str] = use_default_style({'fill' :'#1450A3'})
     def __init__(self, metric_collection: Union[MetricCollection,  Dict[str, Metric]],
                  input_names: Union[List[str], Dict[str, str], str],
                  alive_stages: Union[List[Stage], str, None] = None,
