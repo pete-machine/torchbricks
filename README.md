@@ -17,6 +17,15 @@ jupyter:
 
 -->
 
+# TorchBricks
+[![codecov](https://codecov.io/gh/pete-machine/torchbricks/branch/main/graph/badge.svg?token=torchbricks_token_here)](https://codecov.io/gh/pete-machine/torchbricks)
+[![CI](https://github.com/pete-machine/torchbricks/actions/workflows/main.yml/badge.svg)](https://github.com/pete-machine/torchbricks/actions/workflows/main.yml)
+
+TorchBricks builds pytorch models using small reuseable and decoupled parts - we call them bricks.
+
+The concept is simple and flexible and allows you to more easily combine, add or swap out parts of the model 
+(preprocessor, backbone, neck, head or post-processor), change the task or extend it with multiple tasks.
+
 <!-- #region -->
 
 ## Install it with pip
@@ -28,7 +37,8 @@ pip install torchbricks
 
 ## Bricks by example
 
-First we specify some regular model modules: A preprocessor, a model and a classifier
+To demonstrate the the concepts of TorchBricks, we will first specify some dummy parts used by a regular image classification model: 
+A preprocessor, a backbone and a classifier
 
 ```python
 from typing import Tuple
@@ -60,9 +70,10 @@ class ClassifierDummy(nn.Module):
 
 
 ## Concept 1: Bricks are connected
-Using input and output names, we specify how modules are connected with a regular dictionary. Each module is wrapped inside a brick 
-(here either `BrickTrainable` and `BrickNotTrainable`) and input and output names. 
-The number of input and output names should match the actually number of input and outputs for each function. 
+An important concept of TorchBricks is that it defines how modules are connected by specifying input and output names of
+each module similar to a DAG. 
+
+In below code snippet, we demonstrate how this would look for our dummy model. 
 
 ```python
 from torchbricks.bricks import BrickCollection, BrickTrainable, BrickNotTrainable, BrickLoss
@@ -84,8 +95,10 @@ brick_collection = BrickCollection(bricks)
 print(brick_collection)
 ```
 
-The brick collection created above is visualized. Showing how tensors are passed between bricks used in the 
-specified input and output names. 
+Each module is placed in a dictionary with a unique name and wrapped inside a brick with input and output names. 
+Specifying how outputs of one module is passed to the inputs of the next module. 
+
+Below we visualize how the brick collection connects the different bricks together. 
 
 
 ```mermaid
@@ -138,7 +151,7 @@ Running our models as a brick collection has the following advantages:
 
 - A brick collection act as a regular `nn.Module` with all the familiar features: a `forward`-function, a `to`-function to move 
   to a specific device/precision, you can save/load a model, management of parameters, onnx exportable etc. 
-- A brick collection is also a simple DAG, it accepts a dictionary (`named_inputs`), 
+- A brick collection is also a simple DAG, it accepts a dictionary with "named data" (we call this `named_inputs`), 
 executes each bricks and ensures that the outputs are passed to the inputs of other bricks with matching names. 
 Structuring the model as a DAG, makes it easy to add/remove outputs for a given module during development, add new modules to the
 collection and build completely new models from reusable parts. 
@@ -146,7 +159,7 @@ collection and build completely new models from reusable parts.
   collection easily as a regular dictionary. It can also handle nested dictionary, allowing groups of bricks to be added/removed easily. 
 
 Note also that we set `stage=Stage.INFERENCE` to explicitly specify if we are doing training, validation, test or inference.
-Specifying a stage is important, if we want a module to act in a specific way during specific stages.
+Specifying a stage is important, if we want a module to act in a specific way during a specific stages.
 
 Leading us to the next section
 
@@ -198,10 +211,10 @@ print(create_mermaid_dag_graph(brick_collection))
 We set `preprocessor`, `backbone` and `head` to be alive on all stages `alive_stages="all"` - this is the default behavior and
 similar to before. 
  
-For `loss` we set `alive_stages=[Stage.TRAIN, Stage.VALIDATION, Stage.TEST]` to calculate loss during train, validation and test
+For `loss` we set `alive_stages=[Stage.TRAIN, Stage.VALIDATION, Stage.TEST]` to only calculate loss during train, validation and test
 stages. 
 
-
+This is DAG during train, test and validation is visualized below:
 
 
 ```mermaid
@@ -264,10 +277,16 @@ named_outputs_with_loss = brick_collection(named_inputs={'raw': batch_images, "t
 ```
 
 ## Bricks for model training
-We are not creating a training framework, but to easily use the brick collection in your favorite training framework or custom 
-training/validation/test loop, we need the final piece. We should be able to calculate and gather metrics across a whole dataset. 
+**We are not creating a training framework**, but to easily use the brick collection in your favorite training framework or custom 
+training/validation/test loop, we need the final piece: **Calculate model metrics** 
 
-We will extend our example from before by adding metric bricks and common reusable components from `torchbricks.bag_of_bricks`.
+To easily inject both model, losses and metrics, we also need to easily support metrics and calculate metrics across a dataset. 
+We will extend our example from before by adding metric bricks. 
+
+To calculate metrics across a dataset, we heavily rely on concepts and functions used in the 
+[TorchMetrics](https://torchmetrics.readthedocs.io/en/stable/) library.
+
+The used of TorchMetrics is demonstrated in below code snippet. 
 
 ```python
 import torchvision
@@ -305,18 +324,19 @@ print(f"{metrics=}, {named_outputs.keys()=}")
 ```
 
 
-On each `forward`-call, we calculate model outputs, losses and metrics for each batch. Metrics are aggregated internally in `BrickMetricSingle` 
-and only returned with the `summarize`-call. We set `reset=True` to reset metric aggregation. 
+On each `forward`-call, we calculate model outputs, losses and metrics for each batch. Metrics are aggregated internally 
+in `BrickMetricSingle` and only returned with the `summarize`-call. We set `reset=True` to reset metric aggregation. 
 
-For metrics, we rely on the [TorchMetrics](https://torchmetrics.readthedocs.io/en/stable/) library and passes either a single 
-metric (`torchmetrics.Metric`) to `BrickMetricSingle` or a collection of metrics (`torchmetrics.MetricCollection`) to `BrickMetrics`.
+You have the option of either using a single metric (`torchmetrics.Metric`) with `BrickMetricSingle` or a collection of 
+metrics (`torchmetrics.MetricCollection`) with `BrickMetrics`.
 
-For multiple metrics, use always `BrickMetrics` with `torchmetrics.MetricCollection` [doc](https://torchmetrics.readthedocs.io/en/stable/pages/overview.html#metriccollection). 
-It has some intelligent mechanisms for sharing 
-metrics stats. 
+For multiple metrics, use always `BrickMetrics` with `torchmetrics.MetricCollection` 
+[doc](https://torchmetrics.readthedocs.io/en/stable/pages/overview.html#metriccollection). 
+
+It has some intelligent mechanisms for efficiently sharing calculation for multiple metrics.
 
 Note also that metrics are not passed to other bricks - they are only stored internally. To also pass metrics to other bricks
-(and add computational cost) you can set `return_metrics=True` for `BrickMetrics` and `BrickMetricSingle`.
+(and also add computational cost) you can set `return_metrics=True` for `BrickMetrics` and `BrickMetricSingle`.
 
 
 ## Bricks motivation (to be continued)
@@ -397,9 +417,16 @@ brick_collection.named_parameters()
 torch.compile(brick_collection)
 ```
 
-### Brick features: Act as a dictionary (nn.ModuleDict) and relative input/output names
+### Brick features: Nested bricks and relative input/output names
+To more easily add, remove and swap out a subset of bricks in a brick collection (e.g. bricks related to specific task), we
+support passing a nested dictionary of bricks to a `BrickCollection` and using relative input and output names. 
 
+Both nested dictionaries and relative input and output names are demonstrated below by adding multiple classifications 
+heads (`head0` and `head1`) to a brick collection. Each classification head is created with `create_image_classification_head`. 
 
+Note also that the function uses relative names such as `./logits`, `./probabilities`, `./class_prediction` and `./loss_ce`. 
+Relative names will use the brick name to derive "absolute" names. E.g. for `head0` the relative input name `./logits` 
+becomes `head0/logits` and for `head1` the relative input name `./logits`  becomes `head1/logits`
 
 ```python
 from typing import Dict
@@ -407,7 +434,7 @@ from typing import Dict
 from torchbricks.bricks import BrickInterface
 
 
-def image_classifier_head(num_classes: int, in_channels: int, input_name: str) -> Dict[str, BrickInterface]:
+def create_image_classification_head(num_classes: int, in_channels: int, input_name: str) -> Dict[str, BrickInterface]:
     """Image classifier bricks: Classifier, loss and metrics """
     head = {
         'classify': BrickTrainable(ImageClassifier(num_classes=num_classes, n_features=in_channels),
@@ -427,14 +454,15 @@ bricks = {
                                       input_names=['raw'], 
                                       output_names=['normalized']),
     'backbone': resnet_brick,
-    'head0': image_classifier_head(num_classes=3, in_channels=n_features, input_name='features'),
-    'head1': image_classifier_head(num_classes=5, in_channels=n_features, input_name='features'),
+    'head0': create_image_classification_head(num_classes=3, in_channels=n_features, input_name='features'),
+    'head1': create_image_classification_head(num_classes=5, in_channels=n_features, input_name='features'),
 }
 brick_collections = BrickCollection(bricks)
 print(brick_collections)
 print(create_mermaid_dag_graph(brick_collections))
 ```
 
+Mermaid visualization of above graph: 
 ```mermaid
 flowchart LR
     %% Brick definitions
@@ -488,28 +516,29 @@ flowchart LR
 ```
 
 
-### Bag of bricks - reusable bricks modules
+### Brick features: Bag of bricks - reusable bricks modules
 Note also in above example we use bag-of-bricks to import commonly used `nn.Module`s 
 
 This includes a `Preprocessor`, `ImageClassifier` and `resnet_to_brick` to convert torchvision resnet models into a backbone brick 
 (without a classifier).
 
 
-### Use-case: Training with pytorch-lightning trainer
-I like and love pytorch-lightning! We can avoid writing the easy-to-get-wrong training loop, write validation/test scrips.
+### Brick features: Training with pytorch-lightning trainer
+I like and love pytorch-lightning! We can avoid writing the easy-to-get-wrong training loop and validation/test scrips.
 
-Pytorch lightning will create logs, ensures training is done efficiently on any device (CPU, GPU, TPU), on multiple/distributed devices 
+Pytorch lightning creates logs, ensures training is done efficiently on any device (CPU, GPU, TPU), on multiple/distributed devices 
 with reduced precision and much more.
 
 However, one issue I found myself having when wanting to extend my custom pytorch-lightning module (`LightningModule`) is that it forces an
 object oriented style with multiple levels of inheritance. This is not necessarily bad, but it makes it hard to reuse 
-code across projects and generally made the code complicated. 
+code across projects and generally makes the code complicated. 
 
-With a brick collection you should rarely change or inherit your lightning module, instead you inject the model, metrics and loss functions
+With a brick collection you should rarely change or inherit your lightning module, instead you can inject the model, metrics and loss functions
 into a lightning module. Changes to preprocessor, backbone, necks, heads, metrics and losses are done on the outside
 and injected into the lightning module. 
 
-Below is an example of how you could inject a brick collection into with pytorch-lightning. 
+Below is an example of how you could inject a brick collection with pytorch-lightning. 
+
 We have created `LightningBrickCollection` ([available here](https://github.com/PeteHeine/torchbricks/blob/main/scripts/lightning_module.py)) 
 as an example for you to use. 
 
@@ -590,7 +619,8 @@ MISSING
 - [x] Relative input/output names
 - [x] Test to verify that environment matches conda lock. The make command 'update-lock-file' should store a copy of 'environment.yml'
       We will the have a test checking if the copy and the current version of `environment.yml` is the same.
-- [ ] Create brick-collection visualization tool ("mermaid?")
+- [x] Add code coverage and tests passed badges to readme again
+- [x] Create brick-collection visualization tool ("mermaid?")
 - [ ] Make DAG like functionality to check if a inputs and outputs works for all model stages.
 - [ ] Use pymy, pyright or pyre to do static code checks. 
 - [ ] Decide: Add stage as an internal state and not in the forward pass:
