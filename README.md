@@ -38,7 +38,8 @@ pip install torchbricks
 ## Bricks by example
 
 To demonstrate the the concepts of TorchBricks, we will first specify some dummy parts used by a regular image classification model: 
-A preprocessor, a backbone and a classifier
+A preprocessor, a backbone and a classifier.
+*Note: Don't worry about the actually implementation of these modules. They are just dummy examples.*
 
 ```python
 from typing import Tuple
@@ -98,6 +99,8 @@ print(brick_collection)
 Each module is placed in a dictionary with a unique name and wrapped inside a brick with input and output names. 
 Specifying how outputs of one module is passed to the inputs of the next module. 
 
+Finally, the dictionary of bricks is passed to a `BrickCollection`. 
+
 Below we visualize how the brick collection connects the different bricks together. 
 
 
@@ -134,8 +137,7 @@ flowchart LR
 *We provide the `create_mermaid_dag_graph`-function to visualize brick collection in a markdown*
 
 
-
-The `BrickCollection` is used for executing above graph using a dictionary. 
+The `BrickCollection` is used for executing above graph using a dictionary as input.
 
 ```python
 batch_size=2
@@ -164,11 +166,11 @@ Specifying a stage is important, if we want a module to act in a specific way du
 Leading us to the next section
 
 
-## Concept 2: Bricks can be dead or alive
+## Concept 2: Bricks can be dead (or alive)
 The second concept is to specify when bricks are alive - meaning we specify at which stages (train, test, validation, inference and export) 
 a brick is executed. 
 
-For other stage the brick will play dead - do nothing / return empty dictionary. 
+For other stage the brick will play dead - do nothing / return an empty dictionary. 
 
 Meaning that for different `stages`, we will have the option of creating a unique DAG for each model stage. 
 
@@ -191,10 +193,10 @@ bricks = {
                            input_names=['embedding'], 
                            output_names=['logits', 'softmaxed'], 
                            alive_stages="all"),
-    'loss': BrickLoss(model=nn.CrossEntropyLoss(), 
-                      input_names=['logits', 'targets'], 
-                      output_names=['loss_ce'], 
-                      alive_stages=[Stage.TRAIN, Stage.VALIDATION, Stage.TEST])
+    # 'loss': BrickLoss(model=nn.CrossEntropyLoss(), 
+    #                   input_names=['logits', 'targets'], 
+    #                   output_names=['loss_ce'], 
+    #                   alive_stages=[Stage.TRAIN, Stage.VALIDATION, Stage.TEST])
 }
 brick_collection = BrickCollection(bricks)
 
@@ -214,8 +216,46 @@ similar to before.
 For `loss` we set `alive_stages=[Stage.TRAIN, Stage.VALIDATION, Stage.TEST]` to only calculate loss during train, validation and test
 stages. 
 
-This is DAG during train, test and validation is visualized below:
 
+
+**Graph during inference and export:**
+
+During `Stage.INFERENCE` and `Stage.EXPORT`, the loss modules is dead and `targets` is not required.
+```mermaid
+flowchart LR
+    %% Brick definitions
+    preprocessor("<strong>BrickNotTrainable</strong><br><strong>preprocessor</strong>: PreprocessorDummy"):::BrickNotTrainable
+    backbone("<strong>BrickTrainable</strong><br><strong>backbone</strong>: TinyModel"):::BrickTrainable
+    head("<strong>BrickTrainable</strong><br><strong>head</strong>: ClassifierDummy"):::BrickTrainable
+    
+    %% Draw input and outputs
+    raw:::input --> preprocessor
+    
+    %% Draw nodes and edges
+    preprocessor --> |processed| backbone
+    backbone --> |embedding| head
+    head --> softmaxed:::output
+    head --> logits:::output
+    
+    %% Add styling
+    classDef arrow stroke-width:0px,fill-opacity:0.0 
+    classDef input stroke-width:0px,fill-opacity:0.3,fill:#22A699 
+    classDef output stroke-width:0px,fill-opacity:0.3,fill:#F2BE22 
+    classDef BrickNotTrainable stroke-width:0px,fill:#B56576 
+    classDef BrickTrainable stroke-width:0px,fill:#6D597A 
+    
+    %% Add legends
+    subgraph Legends
+        input(input):::input
+        output(output):::output
+        
+    end
+```
+
+
+**Graph during train, test and validation:**
+
+During `Stage.TRAIN`, `Stage.VALIDATION` and `Stage.TEST` stages, the loss module is alive and both `raw` and `targets` input tensors.
 
 ```mermaid
 flowchart LR
@@ -251,12 +291,13 @@ flowchart LR
     end
 ```
 
+
 <!-- #region -->
 
 
 Another advantages is that model have different input requirements for different stages.
 
-For `Stage.INFERENCE` and `Stage.EXPROT` stages, the model only requires the `raw` tensor as input. 
+For `Stage.INFERENCE` and `Stage.EXPORT` stages, the model only requires the `raw` tensor as input. 
 <!-- #endregion -->
 
 ```python
@@ -364,8 +405,8 @@ Missing sections:
 
 - [x] Export as ONNX
 - [x] Acts as a nn.Module
-- [ ] Acts as a dictionary - Nested brick collection
-- [ ] Training with Pytorch lightning
+- [x] Acts as a dictionary - Nested brick collection
+- [x] Training with Pytorch lightning
 - [ ] Pass all inputs as a dictionary `input_names='all'`
 - [ ] Using stage inside module
 - [ ] the `extract_losses` function
