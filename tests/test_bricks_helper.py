@@ -57,17 +57,17 @@ def test_named_input_and_outputs_callable_two_in_two_out():
     assert named_outputs == {'out0': 4, 'out1': 2}
 
     with pytest.raises(TypeError, match="got an unexpected keyword argument 'not_a_name'"):
-            named_outputs = named_input_and_outputs_callable(add_subtract,
-                                                     named_inputs=named_inputs,
-                                                     input_names={'in0': 'not_a_name', 'in1': 'value1'},
-                                                     output_names=['out0','out1'])
+        named_outputs = named_input_and_outputs_callable(add_subtract,
+                                                    named_inputs=named_inputs,
+                                                    input_names={'in0': 'not_a_name', 'in1': 'value1'},
+                                                    output_names=['out0','out1'])
 
 
     with pytest.raises(AssertionError, match='The number of specified output names'):
-            named_outputs = named_input_and_outputs_callable(add_subtract,
-                                                     named_inputs=named_inputs,
-                                                     input_names={'in0': 'value0', 'in1': 'value1'},
-                                                     output_names=['out0'])
+        named_outputs = named_input_and_outputs_callable(add_subtract,
+                                                    named_inputs=named_inputs,
+                                                    input_names={'in0': 'value0', 'in1': 'value1'},
+                                                    output_names=['out0'])
 
 def test_named_input_and_outputs_callable_all():
     def add_sum_and_prod(named_values: Dict[str, Any]) -> Tuple[float, float]:
@@ -82,7 +82,7 @@ def test_named_input_and_outputs_callable_all():
     assert named_outputs == {'out0': 4, 'out1': 3}
 
     with pytest.raises(AssertionError, match='The number of specified output names'):
-            named_outputs = named_input_and_outputs_callable(add_sum_and_prod,
-                                                     named_inputs=named_inputs,
-                                                     input_names='all',
-                                                     output_names=['out0'])
+        named_outputs = named_input_and_outputs_callable(add_sum_and_prod,
+                                                    named_inputs=named_inputs,
+                                                    input_names='all',
+                                                    output_names=['out0'])

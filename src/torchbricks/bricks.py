@@ -198,9 +198,11 @@ def convert_nested_dict_to_nested_brick_collection(bricks: Dict[str, Union[Brick
         return BrickCollection(converted_bricks)
 
 
+@typechecked
 def resolve_relative_names(bricks: Dict[str, BrickInterface]):
     return _resolve_relative_names_recursive(bricks)
 
+@typechecked
 def _resolve_relative_names_recursive(bricks: Dict[str, BrickInterface], parent: Optional[Path] = None):
     parent = parent or Path('/root')
     for brick_name, brick_or_bricks in bricks.items():
@@ -214,7 +216,10 @@ def _resolve_relative_names_recursive(bricks: Dict[str, BrickInterface], parent:
 
     return bricks
 
-def _resolve_input_or_output_names(input_or_output_names: List[str], parent: Path):
+@typechecked
+def _resolve_input_or_output_names(input_or_output_names: Union[List[str], str], parent: Path) -> Union[List[str], str]:
+    if isinstance(input_or_output_names, str):
+        return input_or_output_names
     input_names_resolved = []
     for input_name in input_or_output_names:
         is_relative_name = input_name[0] == '.'

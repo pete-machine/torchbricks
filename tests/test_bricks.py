@@ -1,5 +1,6 @@
+import textwrap
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, Optional
 
 import pytest
 import torch
@@ -162,15 +163,7 @@ def test_brick_torch_metric_single_metric(metric_name: Optional[str]):
     assert list(metrics) == [expected_metric_name]
 
 
-expected_str='''BrickCollection(
-  (preprocessor): BrickNotTrainable(Preprocessor, input_names=['raw'], output_names=['preprocessed'], alive_stages=['TRAIN', 'VALIDATION', 'TEST', 'INFERENCE', 'EXPORT'])
-  (backbone): BrickTrainable(TinyBackbone, input_names=['preprocessed'], output_names=['features'], alive_stages=['TRAIN', 'VALIDATION', 'TEST', 'INFERENCE', 'EXPORT'])
-  (head): BrickCollection(
-    (classifier): BrickTrainable(Classifier, input_names=['features'], output_names=['predictions'], alive_stages=['TRAIN', 'VALIDATION', 'TEST', 'INFERENCE', 'EXPORT'])
-    (loss): BrickLoss(CrossEntropyLoss, input_names=['predictions', 'labels'], output_names=['ce_loss'], alive_stages=['TRAIN', 'TEST', 'VALIDATION'])
-    (metrics): BrickMetrics(['Accuracy', 'Concatenate', 'ConfMat', 'MeanAccuracy'], input_names=['predictions', 'labels'], output_names=[], alive_stages=['TRAIN', 'TEST', 'VALIDATION'])
-  )
-)''' # noqa: E501
+
 @pytest.mark.parametrize('return_metrics', [False, True])
 def test_brick_torch_metric_multiple_metric(return_metrics: bool):
     num_classes = 5
@@ -201,10 +194,22 @@ def test_brick_torch_metric_multiple_metric(return_metrics: bool):
     expected_metrics = set(metric_collection)
     assert set(metrics) == expected_metrics
 
+
 def test_brick_collection_print():
     num_classes = 10
     bricks = create_brick_collection(num_classes=num_classes, num_backbone_featues=5)
     model = BrickCollection(bricks)
+
+    expected_str = textwrap.dedent('''\
+        BrickCollection(
+          (preprocessor): BrickNotTrainable(Preprocessor, input_names=['raw'], output_names=['preprocessed'], alive_stages=['TRAIN', 'VALIDATION', 'TEST', 'INFERENCE', 'EXPORT'])
+          (backbone): BrickTrainable(TinyBackbone, input_names=['preprocessed'], output_names=['features'], alive_stages=['TRAIN', 'VALIDATION', 'TEST', 'INFERENCE', 'EXPORT'])
+          (head): BrickCollection(
+            (classifier): BrickTrainable(Classifier, input_names=['features'], output_names=['predictions'], alive_stages=['TRAIN', 'VALIDATION', 'TEST', 'INFERENCE', 'EXPORT'])
+            (loss): BrickLoss(CrossEntropyLoss, input_names=['predictions', 'labels'], output_names=['ce_loss'], alive_stages=['TRAIN', 'TEST', 'VALIDATION'])
+            (metrics): BrickMetrics(['Accuracy', 'Concatenate', 'ConfMat', 'MeanAccuracy'], input_names=['predictions', 'labels'], output_names=[], alive_stages=['TRAIN', 'TEST', 'VALIDATION'])
+          )
+        )''') # noqa: E501
     assert model.__str__() == expected_str
 
 
@@ -253,6 +258,35 @@ def test_resolve_relative_names_errors():
     }
     with pytest.raises(ValueError, match='Failed to resolve input name. Unable to resolve'):
         BrickCollection(bricks)
+
+def test_input_names_all():
+    dict_bricks = create_brick_collection(num_classes=3, num_backbone_featues=5)
+
+    class VisualizePredictions(torch.nn.Module):
+        def forward(self, named_inputs: Dict[str, Any]):
+            assert len(named_inputs) == 5
+            return torch.concatenate((named_inputs['raw'], named_inputs['preprocessed']))
+
+    dict_bricks['Visualize'] = bricks.BrickNotTrainable(VisualizePredictions(), input_names='all', output_names=['visualized'])
+    brick_collection = BrickCollection(dict_bricks)
+    brick_collection(named_inputs={'raw': torch.rand((2, 3, 100, 200))}, stage=Stage.INFERENCE)
+
+def test_using_stage_inside_module():
+    class StageDependentOutput(torch.nn.Module):
+        def forward(self, name: str, stage: Stage) -> str:
+            if stage == Stage.VALIDATION:
+                return name + '_in_validation'
+            return name + '_not_in_validation'
+
+    brick_collection = BrickCollection(
+        {
+            'blah': bricks.BrickNotTrainable(StageDependentOutput(), input_names=['name', 'stage'], output_names=['output'])
+        })
+    named_outputs = brick_collection(named_inputs={'name': 'blah'}, stage=Stage.INFERENCE)
+    assert named_outputs['output'] == 'blah_not_in_validation'
+
+    named_outputs = brick_collection(named_inputs={'name': 'blah'}, stage=Stage.VALIDATION)
+    assert named_outputs['output'] == 'blah_in_validation'
 
 
 def test_save_and_load_of_brick_collection(tmp_path: Path):
