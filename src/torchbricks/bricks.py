@@ -30,13 +30,11 @@ class BrickInterface(ABC):
     # 67635c,f5e26b,f1dfca,db9d38,dc9097,c4779f,c75239,84bb84,394a89,7d9dc4
     style: Dict[str, str] = use_default_style()
     def __init__(self,
-                 input_names: Union[List[str], Dict[str, str], str],
+                 input_names: Union[List[str], Dict[str, str]],
                  output_names: List[str],
                  alive_stages: Union[List[Stage], str]) -> None:
         super().__init__()
-        if isinstance(input_names, str):
-            if input_names != 'all':
-                raise ValueError('')
+
         self.input_names = input_names
         self.output_names = output_names
         self.alive_stages: List[Stage] = parse_argument_alive_stages(alive_stages)
@@ -101,7 +99,7 @@ def parse_argument_loss_output_names(loss_output_names: Union[List[str], str], a
 class BrickModule(nn.Module, BrickInterface):
     style: Dict[str, str] = use_default_style({'fill' :'#355070'})
     def __init__(self, model: Union[nn.Module, nn.ModuleDict],
-                 input_names: Union[List[str], Dict[str, str], str],
+                 input_names: Union[List[str], Dict[str, str]],
                  output_names: List[str],
                  alive_stages: Union[List[Stage], str] = 'all',
                  loss_output_names: Union[List[str], str] = 'none',
@@ -203,7 +201,7 @@ def resolve_relative_names(bricks: Dict[str, BrickInterface]):
     return _resolve_relative_names_recursive(bricks)
 
 @typechecked
-def _resolve_relative_names_recursive(bricks: Dict[str, BrickInterface], parent: Optional[Path] = None):
+def _resolve_relative_names_recursive(bricks: Union[Dict[str, BrickInterface], BrickCollection], parent: Optional[Path] = None):
     parent = parent or Path('/root')
     for brick_name, brick_or_bricks in bricks.items():
         if isinstance(brick_or_bricks, (dict, BrickCollection)):
@@ -237,7 +235,7 @@ def _resolve_input_or_output_names(input_or_output_names: Union[List[str], str],
 class BrickTrainable(BrickModule):
     style: Dict[str, str] = use_default_style({'fill' :'#6D597A'})
     def __init__(self, model: nn.Module,
-                 input_names: Union[List[str], Dict[str, str], str],
+                 input_names: Union[List[str], Dict[str, str]],
                  output_names: List[str],
                  loss_output_names: Union[List[str], str] = 'none',
                  alive_stages: Union[List[Stage], str] = 'all'):
@@ -253,7 +251,7 @@ class BrickTrainable(BrickModule):
 class BrickNotTrainable(BrickModule):
     style: Dict[str, str] = use_default_style({'fill' :'#B56576'})
     def __init__(self, model: nn.Module,
-                 input_names: Union[List[str], Dict[str, str], str],
+                 input_names: Union[List[str], Dict[str, str]],
                  output_names: List[str],
                  alive_stages: Union[List[Stage], str] = 'all',
                  calculate_gradients: bool = True):
@@ -270,7 +268,7 @@ class BrickNotTrainable(BrickModule):
 class BrickLoss(BrickModule):
     style: Dict[str, str] = use_default_style({'fill' :'#5C677D'})
     def __init__(self, model: nn.Module,
-                 input_names: Union[List[str], Dict[str, str], str],
+                 input_names: Union[List[str], Dict[str, str]],
                  output_names: List[str],
                  loss_output_names: Union[List[str], str] = 'all',
                  alive_stages: Union[List[Stage], str, None] = None,
@@ -290,7 +288,7 @@ class BrickLoss(BrickModule):
 class BrickMetrics(BrickInterface, nn.Module):
     style: Dict[str, str] = use_default_style({'fill' :'#1450A3'})
     def __init__(self, metric_collection: Union[MetricCollection,  Dict[str, Metric]],
-                 input_names: Union[List[str], Dict[str, str], str],
+                 input_names: Union[List[str], Dict[str, str]],
                  alive_stages: Union[List[Stage], str, None] = None,
                  return_metrics: bool = False,
                  ):
@@ -351,7 +349,7 @@ class BrickMetrics(BrickInterface, nn.Module):
 class BrickMetricSingle(BrickMetrics):
     def __init__(self,
                  metric: Metric,
-                 input_names: Union[List[str], Dict[str, str], str],
+                 input_names: Union[List[str], Dict[str, str]],
                  metric_name: Optional[str] = None,
                  alive_stages: List[Stage] | None = None,
                  return_metrics: bool = False):

@@ -197,8 +197,8 @@ def test_brick_torch_metric_multiple_metric(return_metrics: bool):
 
 def test_brick_collection_print():
     num_classes = 10
-    bricks = create_brick_collection(num_classes=num_classes, num_backbone_featues=5)
-    model = BrickCollection(bricks)
+    brick_collection_as_dict = create_brick_collection(num_classes=num_classes, num_backbone_featues=5)
+    brick_collection = BrickCollection(brick_collection_as_dict)
 
     expected_str = textwrap.dedent('''\
         BrickCollection(
@@ -207,14 +207,14 @@ def test_brick_collection_print():
           (head): BrickCollection(
             (classifier): BrickTrainable(Classifier, input_names=['features'], output_names=['predictions'], alive_stages=['TRAIN', 'VALIDATION', 'TEST', 'INFERENCE', 'EXPORT'])
             (loss): BrickLoss(CrossEntropyLoss, input_names=['predictions', 'labels'], output_names=['ce_loss'], alive_stages=['TRAIN', 'TEST', 'VALIDATION'])
-            (metrics): BrickMetrics(['Accuracy', 'Concatenate', 'ConfMat', 'MeanAccuracy'], input_names=['predictions', 'labels'], output_names=[], alive_stages=['TRAIN', 'TEST', 'VALIDATION'])
+            (metrics): ~~DEACTIVATED~~ - BrickMetrics(['Accuracy', 'Concatenate', 'ConfMat', 'MeanAccuracy'], input_names=['predictions', 'labels'], output_names=[], alive_stages=['TRAIN', 'TEST', 'VALIDATION'])
           )
         )''') # noqa: E501
-    assert model.__str__() == expected_str
+    assert brick_collection.__str__() == expected_str
 
 
 def test_resolve_relative_names():
-    bricks = {
+    brick_collection_as_dict = {
         'preprocessor': BrickModule(model=nn.Identity(), input_names=['raw'], output_names=['processed']),
         'backbone': BrickModule(model=nn.Identity(), input_names=['processed'], output_names=['embeddings']),
         'head0': {
@@ -234,7 +234,7 @@ def test_resolve_relative_names():
         }
     }
 
-    model = BrickCollection(bricks)
+    model = BrickCollection(brick_collection_as_dict)
     assert model['head0']['classifier'].input_names == ['embeddings']
     assert model['head0']['classifier'].output_names == ['head0/predictions']
     assert model['head0']['loss'].input_names == ['head0/predictions']
@@ -267,9 +267,10 @@ def test_input_names_all():
             assert len(named_inputs) == 5
             return torch.concatenate((named_inputs['raw'], named_inputs['preprocessed']))
 
-    dict_bricks['Visualize'] = bricks.BrickNotTrainable(VisualizePredictions(), input_names='all', output_names=['visualized'])
+    dict_bricks['Visualize'] = bricks.BrickNotTrainable(VisualizePredictions(), input_names=['__all__'], output_names=['visualized'])
     brick_collection = BrickCollection(dict_bricks)
     brick_collection(named_inputs={'raw': torch.rand((2, 3, 100, 200))}, stage=Stage.INFERENCE)
+
 
 def test_using_stage_inside_module():
     class StageDependentOutput(torch.nn.Module):

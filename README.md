@@ -396,21 +396,6 @@ Including metrics and losses with the model.
 
 ## Brick features: 
 
-Missing sections:
-
-- [x] Export as ONNX
-- [x] Acts as a nn.Module
-- [x] Acts as a dictionary - Nested brick collection
-- [x] Training with Pytorch lightning
-- [x] Pass all inputs as a dictionary `input_names='all'`
-- [ ] Using stage inside module
-- [ ] the `extract_losses` function
-- [ ] Bag of bricks - reusable bricks modules
-  - [ ] Note also in above example we use bag-of-bricks to import commonly used `nn.Module`s. This includes a `Preprocessor`, `ImageClassifier` and `resnet_to_brick` to convert torchvision resnet models into a backbone brick  (without a classifier).
-- [ ] The default `BrickModule`
-- [ ] In this example we do not use `BrickModule` to build our collection - you can do that -
-but instead we recommend using our pre-configured brick modules (`BrickLoss`, `BrickNotTrainable`, `BrickTrainable`, 
-`BrickMetricSingle` and `BrickCollection`) to both ensure sensible defaults and to show the intend of each brick. 
 
 
 ### Brick features: Export as ONNX
@@ -470,16 +455,16 @@ from typing import Dict
 from torchbricks.bricks import BrickInterface
 
 
-def create_image_classification_head(num_classes: int, in_channels: int, input_name: str) -> Dict[str, BrickInterface]:
+def create_image_classification_head(num_classes: int, in_channels: int, features_name: str, targets_name: str) -> Dict[str, BrickInterface]:
     """Image classifier bricks: Classifier, loss and metrics """
     head = {
         'classify': BrickTrainable(ImageClassifier(num_classes=num_classes, n_features=in_channels),
-                                   input_names=[input_name], 
+                                   input_names=[features_name], 
                                    output_names=['./logits', './probabilities', './class_prediction']),
         'accuracy': BrickMetricSingle(MulticlassAccuracy(num_classes=num_classes), 
-                                      input_names=['./class_prediction', 'targets']),
+                                      input_names=['./class_prediction', targets_name]),
         'loss': BrickLoss(model=nn.CrossEntropyLoss(),
-                          input_names=['./logits', 'targets'], 
+                          input_names=['./logits', targets_name], 
                           output_names=['./loss_ce'])
     }
     return head
@@ -490,8 +475,8 @@ bricks = {
                                       input_names=['raw'], 
                                       output_names=['normalized']),
     'backbone': resnet_brick,
-    'head0': create_image_classification_head(num_classes=3, in_channels=n_features, input_name='features'),
-    'head1': create_image_classification_head(num_classes=5, in_channels=n_features, input_name='features'),
+    'head0': create_image_classification_head(num_classes=3, in_channels=n_features, features_name='features', targets_name='targets'),
+    'head1': create_image_classification_head(num_classes=5, in_channels=n_features, features_name='features', targets_name='targets'),
 }
 brick_collections = BrickCollection(bricks)
 print(brick_collections)
@@ -598,7 +583,7 @@ bricks_lightning_module = LightningBrickCollection(path_experiments=Path("build"
                                                    create_optimizers_func=create_opimtizer_func)
 
 trainer = pl.Trainer(max_epochs=1, limit_train_batches=2, limit_val_batches=2, limit_test_batches=2)
-# To train and test model
+# Train and test model by injecting 'bricks_lightning_module'
 # trainer.fit(bricks_lightning_module, datamodule=data_module)
 # trainer.test(bricks_lightning_module, datamodule=data_module)
 ```
@@ -607,14 +592,17 @@ trainer = pl.Trainer(max_epochs=1, limit_train_batches=2, limit_val_batches=2, l
 
 
 
-## Brick features: Pass all intermediate tensors to a brick `input_names='all'` 
-By passing `'all'` to `input_names` it is possible to access all tensors as a dictionary. 
-For production code, this may not be the best option, but can be valuable during an exploration phase or 
+## Brick features: Pass all intermediate tensors to Brick
+By adding `'__all__'` to `input_names`, it is possible to access all tensors as a dictionary inside a brick module. 
+For production code, this may not be the best option, but this feature can be valuable during an exploration phase or 
 when doing some live debugging of a new model/module. 
 
 We will demonstrate in code by introducing a (dummy) module `VisualizeRawAndPreprocessed`.
 
 *Note: It is just a dummy class, don't worry to much about the actual implementation.*
+
+The important thing to notice is that `input_names = ['__all__']` is used for our `visualizer`-brick to
+pass all tensors as a dictionary as an argument in the forward call. 
 
 ```python
 class VisualizeRawAndPreprocessed(torch.nn.Module):
@@ -627,15 +615,11 @@ class VisualizeRawAndPreprocessed(torch.nn.Module):
 bricks = {
     'preprocessor': BrickNotTrainable(PreprocessorDummy(), input_names=['raw'],  output_names=['preprocessed']),
     'backbone': BrickTrainable(TinyModel(n_channels=3, n_features=10), input_names=['preprocessed'], output_names=['embedding']),
-    'visualize_stuff': BrickNotTrainable(VisualizeRawAndPreprocessed(), input_names = "all", output_names=["visualization"])
+    'visualizer': BrickNotTrainable(VisualizeRawAndPreprocessed(), input_names = ['__all__'], output_names=["visualization"])
 }
 brick_collection = BrickCollection(bricks)
 named_outputs = brick_collection(named_inputs={'raw': torch.rand((2, 3, 100, 200))}, stage=Stage.INFERENCE)
 ```
-
-The important thing to notice is that the forward call of `VisualizeRawAndPreprocessed` is a dictionary and that 
-`input_names = 'all'` makes our brick (in this example `BrickNotTrainable`) passed all tensors to the forward call. 
-
 
 ## Brick features: Using Stage Inside Module
 By passing in `stage` in `input_names` it is possible to change the program flow. 
@@ -704,6 +688,8 @@ MISSING
 - [x] Add code coverage and tests passed badges to readme again
 - [x] Create brick-collection visualization tool ("mermaid?")
 - [x] Make DAG like functionality to check if a inputs and outputs works for all model stages.
+- [ ] Make common Visualizations with pillow - not opencv to not blow up the required dependencies. ImageClassification, Segmentation, ObjectDetection
+  - [ ] Maybe visualizations should be done in OpenCV it is faster. 
 - [ ] Use pymy, pyright or pyre to do static code checks. 
 - [ ] Decide: Add stage as an internal state and not in the forward pass:
   - Minor Pros: Tracing (to get onnx model) requires only torch.Tensors only as input - we avoid making an adapter class. 
@@ -713,8 +699,6 @@ MISSING
   - [ ] All the modules in the README should be easy to import as actually modules.
   - [ ] Make common brick collections: BricksImageClassification, BricksSegmentation, BricksPointDetection, BricksObjectDetection
 - [ ] Support preparing data in the dataloader?
-- [ ] Make common Visualizations with pillow - not opencv to not blow up the required dependencies. ImageClassification, Segmentation, ObjectDetection
-  - [ ] Maybe visualizations should be done in OpenCV it is faster. 
 - [ ] Support torch.jit.scripting? 
 
 ## How does it really work?

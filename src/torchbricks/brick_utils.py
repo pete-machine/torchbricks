@@ -22,11 +22,11 @@ class _OnnxExportAdaptor(nn.Module):
 
 @typechecked
 def export_bricks_as_onnx(path_onnx: Path,
-                                    brick_collection: BrickCollection,
-                                    named_inputs: Dict[str, torch.Tensor],
-                                    dynamic_batch_size: bool,
-                                    stage: Stage = Stage.EXPORT,
-                                    **onnx_export_kwargs):
+                          brick_collection: BrickCollection,
+                          named_inputs: Dict[str, torch.Tensor],
+                          dynamic_batch_size: bool,
+                          stage: Stage = Stage.EXPORT,
+                          **onnx_export_kwargs):
 
     outputs = brick_collection(named_inputs=named_inputs, stage=stage, return_inputs=False)
     onnx_exportable = _OnnxExportAdaptor(model=brick_collection, stage=stage)

@@ -77,12 +77,12 @@ def test_named_input_and_outputs_callable_all():
     named_inputs = {'in0': 3, 'in1': 1}
     named_outputs = named_input_and_outputs_callable(add_sum_and_prod,
                                                      named_inputs=named_inputs,
-                                                     input_names='all',
+                                                     input_names=['__all__'],
                                                      output_names=['out0', 'out1'])
     assert named_outputs == {'out0': 4, 'out1': 3}
 
     with pytest.raises(AssertionError, match='The number of specified output names'):
         named_outputs = named_input_and_outputs_callable(add_sum_and_prod,
                                                     named_inputs=named_inputs,
-                                                    input_names='all',
+                                                    input_names=['__all__'],
                                                     output_names=['out0'])
