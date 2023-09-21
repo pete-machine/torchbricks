@@ -703,7 +703,7 @@ MISSING
       We will the have a test checking if the copy and the current version of `environment.yml` is the same.
 - [x] Add code coverage and tests passed badges to readme again
 - [x] Create brick-collection visualization tool ("mermaid?")
-- [ ] Make DAG like functionality to check if a inputs and outputs works for all model stages.
+- [x] Make DAG like functionality to check if a inputs and outputs works for all model stages.
 - [ ] Use pymy, pyright or pyre to do static code checks. 
 - [ ] Decide: Add stage as an internal state and not in the forward pass:
   - Minor Pros: Tracing (to get onnx model) requires only torch.Tensors only as input - we avoid making an adapter class. 
