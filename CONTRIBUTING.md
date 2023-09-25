@@ -2,9 +2,7 @@
 
 torchbricks welcomes contributions from the community.
 
-**You need PYTHON3!**
-
-This instructions are for linux base systems. (Linux, MacOS, BSD, etc.)
+This instructions are for linux base systems.
 ## Setting up your own fork of this repo.
 
 - On github interface click on `Fork` button.
@@ -38,12 +36,6 @@ Run `make test` to run the tests.
 
 Ensure code coverage is high and add tests to your PR.
 
-## Build the docs locally
-
-Run `make docs` to build the docs.
-
-Ensure your new changes are documented.
-
 ## Commit your changes
 
 This project uses [conventional git commit messages](https://www.conventionalcommits.org/en/v1.0.0/).
@@ -65,36 +57,14 @@ This project comes with a `Makefile` that contains a number of useful utility.
 
 ```bash
 ❯ make
-Usage: make <target>
-
-Targets:
-help:             ## Show the help.
-install:          ## Install the project in dev mode.
-lint:             ## Run ruff linters.
-test: lint        ## Run tests and generate coverage report.
-watch:            ## Run tests on every change.
-clean:            ## Clean unused files.
-release:          ## Create a new tag for release.
-docs:             ## Build the documentation.
+clean                     Clean unused files.
+install                   create environment using lock-file
+lint                      Perform linting on all files using pre-commit
+readme-update             Convert README.ipynb to README.md
+release-minor             Create a new minor (X.Y+1.Z) tag for release.
+release-patch             Create a new patch (X.Y.Z+1) tag for release.
+show                      Show the current environment.
+test-all                  Run tests and generate coverage report.
+update-lock-file          Update lock file using the specification in 'environment.yml'
+update                    Update lock file and environment using the specification in 'environment.yml'
 ```
-
-## Making a new release
-
-This project uses [semantic versioning](https://semver.org/) and tags releases with `X.Y.Z`
-Every time a new tag is created and pushed to the remote repo, github actions will
-automatically create a new release on github and trigger a release on PyPI.
-
-For this to work you need to setup a secret called `PIPY_API_TOKEN` on the project settings>secrets,
-this token can be generated on [pypi.org](https://pypi.org/account/).
-
-To trigger a new release all you need to do is.
-
-1. If you have changes to add to the repo
-    * Make your changes following the steps described above.
-    * Commit your changes following the [conventional git commit messages](https://www.conventionalcommits.org/en/v1.0.0/).
-2. Run the tests to ensure everything is working.
-4. Run `make release` to create a new tag and push it to the remote repo.
-
-the `make release` will ask you the version number to create the tag, ex: type `0.1.1` when you are asked.
-
-> **CAUTION**:  The make release will change local changelog files and commit all the unstaged changes you have.

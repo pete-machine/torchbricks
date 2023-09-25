@@ -1,7 +1,8 @@
+import inspect
 from abc import ABC, abstractmethod
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 from torch import nn
 from torchmetrics import Metric, MetricCollection
@@ -16,9 +17,6 @@ class Stage(Enum):
     TEST = 'test'
     INFERENCE = 'inference'
     EXPORT = 'export'
-
-
-
 
 def use_default_style(overwrites: Optional[Dict[str, str]] = None):
     overwrites = overwrites or {}
@@ -42,6 +40,9 @@ class BrickInterface(ABC):
     def run_now(self, stage: Stage) -> bool:
         return stage in self.alive_stages
 
+    def __call__(self, named_inputs: Dict[str, Any], stage: Stage) -> Dict[str, Any]:
+        return self.forward(named_inputs=named_inputs, stage=stage)
+
     @abstractmethod
     def forward(self, named_inputs: Dict[str, Any], stage: Stage) -> Dict[str, Any]:
         """"""
@@ -51,16 +52,16 @@ class BrickInterface(ABC):
         """"""
 
     @abstractmethod
-    def summarize(self, stage: Stage, reset: bool) -> Dict[str, Any]:
-        """"""
-
-    @abstractmethod
     def get_module_name(self) -> str:
         """"""
 
+    def summarize(self, stage: Stage, reset: bool) -> Dict[str, Any]:
+        if hasattr(self.model, 'summarize') and inspect.isfunction(self.model.summarize):
+            return self.model(stage=stage, reset=reset)
+        return {}
+
     def get_brick_type(self) -> str:
         return self.__class__.__name__
-
 
     def __repr__(self) -> str:
         input_names = self.input_names
@@ -98,7 +99,7 @@ def parse_argument_loss_output_names(loss_output_names: Union[List[str], str], a
 @typechecked
 class BrickModule(nn.Module, BrickInterface):
     style: Dict[str, str] = use_default_style({'fill' :'#355070'})
-    def __init__(self, model: Union[nn.Module, nn.ModuleDict],
+    def __init__(self, model: Union[nn.Module, nn.ModuleDict, Callable],
                  input_names: Union[List[str], Dict[str, str]],
                  output_names: List[str],
                  alive_stages: Union[List[Stage], str] = 'all',
@@ -136,9 +137,6 @@ class BrickModule(nn.Module, BrickInterface):
     def extract_losses(self, named_outputs: Dict[str, Any]) -> Dict[str, Any]:
         named_losses = {name: loss for name, loss in named_outputs.items() if name in self.loss_output_names}
         return named_losses
-
-    def summarize(self, stage: Stage, reset: bool) -> Dict[str, Any]:
-        return {}
 
     def get_module_name(self) -> str:
         return self.model.__class__.__name__
@@ -215,11 +213,15 @@ def _resolve_relative_names_recursive(bricks: Union[Dict[str, BrickInterface], B
     return bricks
 
 @typechecked
-def _resolve_input_or_output_names(input_or_output_names: Union[List[str], str], parent: Path) -> Union[List[str], str]:
-    if isinstance(input_or_output_names, str):
-        return input_or_output_names
+def _resolve_input_or_output_names(input_or_output_names: Union[List[str], Dict[str, str]],
+                                   parent: Path) -> Union[List[str], Dict[str, str]]:
+
+    if isinstance(input_or_output_names, dict):
+        data_names = input_or_output_names.values()
+    else:
+        data_names = list(input_or_output_names)
     input_names_resolved = []
-    for input_name in input_or_output_names:
+    for input_name in data_names:
         is_relative_name = input_name[0] == '.'
         if is_relative_name:
             input_name_as_path = Path(parent / input_name).resolve()
@@ -228,6 +230,9 @@ def _resolve_input_or_output_names(input_or_output_names: Union[List[str], str],
                                   'to an actual name. ')
             input_name = str(input_name_as_path.relative_to('/root'))
         input_names_resolved.append(input_name)
+
+    if isinstance(input_or_output_names, dict):
+        input_names_resolved = dict(zip(input_or_output_names.keys(), input_names_resolved))
     return input_names_resolved
 
 
@@ -312,6 +317,7 @@ class BrickMetrics(BrickInterface, nn.Module):
         self.metrics = nn.ModuleDict({stage.name: metric_collection.clone() for stage in alive_stages})
 
     def forward(self, named_inputs: Dict[str, Any], stage: Stage) -> Dict[str, Any]:
+        named_inputs['stage'] = stage
         metric_collection = self.metrics[stage.name]
         if self.return_metrics:
             output_names = ['metrics']
@@ -356,3 +362,35 @@ class BrickMetricSingle(BrickMetrics):
         metric_name = metric_name or metric.__class__.__name__
         super().__init__(metric_collection={metric_name: metric}, input_names=input_names, alive_stages=alive_stages,
                          return_metrics=return_metrics)
+
+@typechecked
+class BrickTensorAsArrays(BrickModule):
+    """
+    Preferably BrickTensorsAsArray would be a only BrickInterface.
+    But to have it in a brick collection (which is a inherently nn.ModuleDict) it needs to be a nn.Module/BrickModule.
+    """
+    style: Dict[str, str] = use_default_style({'fill' :'#5C677D'})
+    def __init__(self, callable: Callable,
+                 input_names: Union[List[str], Dict[str, str]],
+                 output_names: List[str],
+                 alive_stages: Union[List[Stage], str, None] = None,
+                 ):
+
+        alive_stages = alive_stages or [Stage.INFERENCE]
+        super().__init__(model=self.unpack_data,
+                         input_names=input_names,
+                         output_names=output_names,
+                         loss_output_names='none',
+                         alive_stages=alive_stages,
+                         calculate_gradients=False,
+                         trainable=False)
+
+    def unpack_data(self, *args, **kwargs):
+        has_positional = len(args) > 0
+        has_keyword_args = len(kwargs) > 0
+        assert has_positional or has_keyword_args, 'No input data was provided'
+
+        return 'blah'
+
+    def get_module_name(self) -> str:
+        return self.callable.__name__

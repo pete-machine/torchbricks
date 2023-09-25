@@ -690,6 +690,9 @@ MISSING
 - [x] Make DAG like functionality to check if a inputs and outputs works for all model stages.
 - [ ] Make common Visualizations with pillow - not opencv to not blow up the required dependencies. ImageClassification, Segmentation, ObjectDetection
   - [ ] Maybe visualizations should be done in OpenCV it is faster. 
+  - [ ] VideoModule to store data as a video
+  - [ ] DisplayModule to show data
+- [ ] Multiple named tensors caching module. 
 - [ ] Use pymy, pyright or pyre to do static code checks. 
 - [ ] Decide: Add stage as an internal state and not in the forward pass:
   - Minor Pros: Tracing (to get onnx model) requires only torch.Tensors only as input - we avoid making an adapter class. 

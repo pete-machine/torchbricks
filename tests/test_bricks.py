@@ -7,7 +7,7 @@ import torch
 import torchmetrics
 from torch import nn
 from torchbricks import bricks, custom_metrics
-from torchbricks.bricks import BrickCollection, BrickLoss, BrickMetrics, BrickMetricSingle, BrickModule, Stage
+from torchbricks.bricks import BrickCollection, BrickLoss, BrickMetrics, BrickMetricSingle, BrickModule, BrickTensorAsArrays, Stage
 from torchmetrics.classification import MulticlassAccuracy
 from utils_testing.utils_testing import assert_equal_dictionaries, create_brick_collection
 
@@ -246,6 +246,44 @@ def test_resolve_relative_names():
     assert model['head1']['head1_nested']['loss'].input_names == ['head1/head1_nested/predictions']
     assert model['head1']['head1_nested']['loss'].output_names == ['head1/head1_nested/loss']
 
+def test_resolve_relative_names_dict():
+    class SomeDummyLoss(nn.Module):
+        def forward(self, tensor: torch.Tensor, named_data: Dict[str, Any]) -> torch.Tensor:
+            assert set(named_data.keys()) == {'stage', 'raw', 'processed', 'embeddings', 'head0/predictions'}
+            return tensor
+
+    brick_collection_as_dict = {
+        'preprocessor': BrickModule(model=nn.Identity(), input_names=['raw'], output_names=['processed']),
+        'backbone': BrickModule(model=nn.Identity(), input_names=['processed'], output_names=['embeddings']),
+        'head0': {
+            'classifier': BrickModule(model=nn.Identity(), input_names=['../embeddings'], output_names=['./predictions']),
+            'loss': BrickModule(model=SomeDummyLoss(), input_names={'tensor': './predictions', 'named_data': '__all__'},
+                                     output_names=['./loss']),
+        },
+    }
+
+    model = BrickCollection(brick_collection_as_dict)
+    assert model['head0']['classifier'].input_names == ['embeddings']
+    assert model['head0']['classifier'].output_names == ['head0/predictions']
+    assert model['head0']['loss'].input_names == {'tensor': 'head0/predictions', 'named_data': '__all__'}
+    assert model['head0']['loss'].output_names == ['head0/loss']
+
+    model(named_inputs={'raw': torch.rand((2, 3, 10, 20))}, stage=Stage.TRAIN)
+
+@pytest.mark.skip('Not implemented yet')
+def test_brick_tensor_as_arrays():
+    def draw_function(tensor: torch.Tensor, named_data: Dict[str, Any]) -> torch.Tensor:
+        assert set(named_data.keys()) == {'stage', 'raw', 'processed', 'embeddings', 'head0/predictions'}
+        return tensor
+
+    brick_collection_as_dict = {
+        'preprocessor': BrickModule(model=nn.Identity(), input_names=['raw'], output_names=['processed']),
+        'backbone': BrickModule(model=nn.Identity(), input_names=['processed'], output_names=['embeddings']),
+        'visualizer': BrickTensorAsArrays(callable=draw_function, input_names=['raw', '__all__'], output_names=['visualized']),
+    }
+
+    model = BrickCollection(brick_collection_as_dict)
+    model(named_inputs={'raw': torch.rand((2, 3, 10, 20))}, stage=Stage.INFERENCE)
 
 def test_resolve_relative_names_errors():
     bricks = {
