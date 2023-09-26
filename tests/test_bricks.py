@@ -1,14 +1,16 @@
 import textwrap
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
+import numpy as np
 import pytest
 import torch
 import torchmetrics
 from torch import nn
 from torchbricks import bricks, custom_metrics
-from torchbricks.bricks import BrickCollection, BrickLoss, BrickMetrics, BrickMetricSingle, BrickModule, BrickTensorAsArrays, Stage
+from torchbricks.bricks import BrickCollection, BrickLoss, BrickMetrics, BrickMetricSingle, BrickModule, BrickUnbatched, Stage
 from torchmetrics.classification import MulticlassAccuracy
+from typeguard import typechecked
 from utils_testing.utils_testing import assert_equal_dictionaries, create_brick_collection
 
 
@@ -270,20 +272,77 @@ def test_resolve_relative_names_dict():
 
     model(named_inputs={'raw': torch.rand((2, 3, 10, 20))}, stage=Stage.TRAIN)
 
-@pytest.mark.skip('Not implemented yet')
-def test_brick_tensor_as_arrays():
-    def draw_function(tensor: torch.Tensor, named_data: Dict[str, Any]) -> torch.Tensor:
-        assert set(named_data.keys()) == {'stage', 'raw', 'processed', 'embeddings', 'head0/predictions'}
-        return tensor
+
+def test_brick_tensor_as_arrays_single_output_name():
+    @typechecked
+    def draw_function(array: np.ndarray, named_data: Dict[str, Any]) -> np.ndarray:
+        assert array.shape == (10, 20, 3)
+        assert set(named_data.keys()) == {'stage', 'raw', 'processed', 'embeddings'}
+        return array
 
     brick_collection_as_dict = {
         'preprocessor': BrickModule(model=nn.Identity(), input_names=['raw'], output_names=['processed']),
         'backbone': BrickModule(model=nn.Identity(), input_names=['processed'], output_names=['embeddings']),
-        'visualizer': BrickTensorAsArrays(callable=draw_function, input_names=['raw', '__all__'], output_names=['visualized']),
+        'visualizer': BrickUnbatched(callable=draw_function, input_names=['raw', '__all__'], output_names=['visualized']),
     }
 
+    batch_size = 5
     model = BrickCollection(brick_collection_as_dict)
-    model(named_inputs={'raw': torch.rand((2, 3, 10, 20))}, stage=Stage.INFERENCE)
+    outputs = model(named_inputs={'raw': torch.rand((batch_size, 3, 10, 20))}, stage=Stage.INFERENCE)
+    assert len(outputs['visualized']) == batch_size
+    assert outputs['visualized'][0].shape == (10, 20, 3)
+    assert set(outputs) == {'raw', 'processed', 'embeddings', 'visualized', 'stage'}
+
+def test_brick_tensor_as_arrays_two_output_names():
+    @typechecked
+    def draw_function(array0: np.ndarray, array1: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        assert array0.shape == (10, 20, 3)
+        assert array1.shape == (10, 20, 3)
+        return array0, array1
+
+    brick_collection_as_dict = {
+        'preprocessor': BrickModule(model=nn.Identity(), input_names=['raw'], output_names=['processed']),
+        'backbone': BrickModule(model=nn.Identity(), input_names=['processed'], output_names=['embeddings']),
+        'visualizer': BrickUnbatched(callable=draw_function, input_names=['raw', 'processed'],
+                                     output_names=['visualized0', 'visualized1']),
+    }
+
+    batch_size = 5
+    model = BrickCollection(brick_collection_as_dict)
+    outputs = model(named_inputs={'raw': torch.rand((batch_size, 3, 10, 20))}, stage=Stage.INFERENCE)
+    assert len(outputs['visualized0']) == batch_size
+    assert len(outputs['visualized1']) == batch_size
+    assert outputs['visualized0'][0].shape == (10, 20, 3)
+    assert outputs['visualized1'][0].shape == (10, 20, 3)
+
+@pytest.mark.parametrize(['permute_tensors', 'tensors_to_numpy'], [(False, False), (True, False), (True, True), (False, True)])
+def test_brick_tensor_as_arrays_two_output_names_params(permute_tensors, tensors_to_numpy):
+    @typechecked
+    def draw_function(array0, arrays: np.ndarray):
+        assert arrays.shape == (10, 20, 3)  # List of arrays should be untouched by the function for all cases
+        return array0
+
+    brick_collection_as_dict = {
+        'visualizer': BrickUnbatched(callable=draw_function, input_names=['raw', 'arrays'], output_names=['visualized0'],
+                                     permute_tensors=permute_tensors, tensors_to_numpy=tensors_to_numpy)
+        }
+
+    batch_size = 5
+    model = BrickCollection(brick_collection_as_dict)
+    list_of_arrays = [np.random.random((10, 20, 3)) for _ in range(batch_size)]
+    outputs = model(named_inputs={'raw': torch.rand((batch_size, 3, 10, 20)), 'arrays': list_of_arrays}, stage=Stage.INFERENCE)
+
+    assert len(outputs['visualized0']) == batch_size
+    single_image = outputs['visualized0'][0]
+    if tensors_to_numpy:
+        assert isinstance(single_image, np.ndarray)
+    else:
+        assert isinstance(single_image, torch.Tensor)
+    actual_shape = single_image.shape
+    if permute_tensors:
+        assert actual_shape == (10, 20, 3)
+    else:
+        assert actual_shape == (3, 10, 20)
 
 def test_resolve_relative_names_errors():
     bricks = {
@@ -296,6 +355,20 @@ def test_resolve_relative_names_errors():
     }
     with pytest.raises(ValueError, match='Failed to resolve input name. Unable to resolve'):
         BrickCollection(bricks)
+
+def test_no_inputs_or_outputs():
+
+    class NoInputsNoOutputs(torch.nn.Module):
+        def forward(self) -> None:
+            return None
+
+    bricks = {
+        'preprocessor': BrickModule(model=NoInputsNoOutputs(), input_names=[], output_names=[]),
+    }
+
+    brick_collection = BrickCollection(bricks)
+    brick_collection(named_inputs={'raw': torch.rand((2, 3, 100, 200))}, stage=Stage.INFERENCE)
+
 
 def test_input_names_all():
     dict_bricks = create_brick_collection(num_classes=3, num_backbone_featues=5)
@@ -349,7 +422,6 @@ def iterate_stages():
         model(named_inputs=named_inputs, stage=stage)
         model.on_step(named_inputs=named_inputs, stage=stage, batch_idx=0)
         model.summarize(stage, reset=True)
-
 
 @pytest.mark.slow
 @pytest.mark.parametrize('stage', [Stage.TRAIN, Stage.INFERENCE])

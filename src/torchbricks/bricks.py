@@ -1,14 +1,16 @@
 import inspect
 from abc import ABC, abstractmethod
+from collections import Counter, defaultdict
 from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Union
 
+import torch
 from torch import nn
 from torchmetrics import Metric, MetricCollection
 from typeguard import typechecked
 
-from torchbricks.bricks_helper import named_input_and_outputs_callable
+from torchbricks.bricks_helper import name_callable_outputs, named_input_and_outputs_callable
 
 
 class Stage(Enum):
@@ -54,6 +56,15 @@ class BrickInterface(ABC):
     @abstractmethod
     def get_module_name(self) -> str:
         """"""
+
+    def input_names_as_list(self) -> List[str]:
+        input_names = self.input_names
+        if isinstance(input_names, dict):
+            input_names = list(input_names.values())
+        return input_names
+
+    def output_names_as_list(self) -> List[str]:
+        return self.output_names
 
     def summarize(self, stage: Stage, reset: bool) -> Dict[str, Any]:
         if hasattr(self.model, 'summarize') and inspect.isfunction(self.model.summarize):
@@ -364,33 +375,83 @@ class BrickMetricSingle(BrickMetrics):
                          return_metrics=return_metrics)
 
 @typechecked
-class BrickTensorAsArrays(BrickModule):
+class BrickUnbatched(BrickModule):
     """
-    Preferably BrickTensorsAsArray would be a only BrickInterface.
-    But to have it in a brick collection (which is a inherently nn.ModuleDict) it needs to be a nn.Module/BrickModule.
+    Brick to perform operations on a batched input to a list of unbatched inputs.
+    Useful when during per image visualization and processing.
     """
     style: Dict[str, str] = use_default_style({'fill' :'#5C677D'})
     def __init__(self, callable: Callable,
                  input_names: Union[List[str], Dict[str, str]],
                  output_names: List[str],
                  alive_stages: Union[List[Stage], str, None] = None,
+                 permute_tensors = True,
+                 tensors_to_numpy = True,
                  ):
-
+        self.permute_tensors = permute_tensors
+        self.tensors_as_array = tensors_to_numpy
+        self.callable = callable
         alive_stages = alive_stages or [Stage.INFERENCE]
         super().__init__(model=self.unpack_data,
                          input_names=input_names,
                          output_names=output_names,
-                         loss_output_names='none',
+                         loss_output_names=[],
                          alive_stages=alive_stages,
                          calculate_gradients=False,
                          trainable=False)
 
     def unpack_data(self, *args, **kwargs):
-        has_positional = len(args) > 0
-        has_keyword_args = len(kwargs) > 0
-        assert has_positional or has_keyword_args, 'No input data was provided'
+        uses_keyword_args = len(kwargs) > 0
 
-        return 'blah'
+        if uses_keyword_args:
+            tensors = list(kwargs.values())
+        else:
+            tensors = list(args)
+
+        unpack_types = (torch.Tensor, list)
+        batch_sizes = [len(batched_data) for batched_data in tensors if isinstance(batched_data, unpack_types)]
+        if len(batch_sizes) == 0:
+            raise ValueError(f'Can not estimate batch size from these inputs: {self.input_names_as_list()}')
+
+        batch_size_counts = Counter(batch_sizes)
+        if len(batch_size_counts) > 1:
+            raise ValueError(f'Batch size is not the same for all inputs: {self.input_names_as_list()}')
+
+        batch_size = batch_size_counts.most_common(1)[0][0]
+        per_image_data = defaultdict(list)
+        for batched_data in tensors:
+            if isinstance(batched_data, unpack_types):
+
+                if isinstance(batched_data, torch.Tensor):
+                    if self.permute_tensors:
+                        batched_data = batched_data.permute(permute_order_from_channel_first_to_channel_last(batched_data))
+
+                    if self.tensors_as_array:
+                        batched_data = batched_data.detach().cpu().numpy()
+
+                for i_image, data in enumerate(batched_data):
+                    per_image_data[i_image].append(data)
+            else:
+                for i_image in range(batch_size):
+                    per_image_data[i_image].append(batched_data)  # Only list and tensors are unpacked. Other data types are passed as is.
+
+        outputs_per_image = defaultdict(list)
+        for i_image in range(batch_size):
+            if uses_keyword_args:
+                image_outputs = self.callable(**dict(zip(kwargs.keys(), per_image_data[i_image])))
+            else:
+                image_outputs = self.callable(*per_image_data[i_image])
+
+            named_outputs = name_callable_outputs(outputs=image_outputs, output_names=self.output_names)
+            for output_name, output in named_outputs.items():
+                outputs_per_image[output_name].append(output)
+
+        return tuple(outputs_per_image.values())
 
     def get_module_name(self) -> str:
         return self.callable.__name__
+
+
+def permute_order_from_channel_first_to_channel_last(tensor: torch.Tensor) -> List[int]:
+    permute_order_channel_last = [0, *list(range(2, tensor.ndim))] + [1]
+    return permute_order_channel_last
