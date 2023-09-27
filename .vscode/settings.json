@@ -1,4 +1,8 @@
 {
+    "autoDocstring.docstringFormat": "numpy",
+    "cSpell.words": [
+        "torchvision"
+    ],
     "editor.rulers": [
         140
       ],
@@ -14,8 +18,5 @@
     "[python]": {
         "editor.defaultFormatter": "ms-python.python"
     },
-    "python.formatting.provider": "none",
-    "cSpell.words": [
-        "torchvision"
-    ]
+    "python.formatting.provider": "none"
 }

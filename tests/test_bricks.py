@@ -8,7 +8,7 @@ import torch
 import torchmetrics
 from torch import nn
 from torchbricks import bricks, custom_metrics
-from torchbricks.bricks import BrickCollection, BrickLoss, BrickMetrics, BrickMetricSingle, BrickModule, BrickUnbatched, Stage
+from torchbricks.bricks import BrickCollection, BrickLoss, BrickMetrics, BrickMetricSingle, BrickModule, BrickPerImageProcessing, Stage
 from torchmetrics.classification import MulticlassAccuracy
 from typeguard import typechecked
 from utils_testing.utils_testing import assert_equal_dictionaries, create_brick_collection
@@ -273,76 +273,107 @@ def test_resolve_relative_names_dict():
     model(named_inputs={'raw': torch.rand((2, 3, 10, 20))}, stage=Stage.TRAIN)
 
 
-def test_brick_tensor_as_arrays_single_output_name():
+@pytest.mark.parametrize('input_names', [['raw', '__all__'], {'named_data': '__all__', 'array': 'raw'}])
+def test_brick_per_image_processing_single_output_name(input_names):
+    batch_size = 5
+    unbatched_shape_raw = (3, 10, 20)
+    image_raw = torch.rand((batch_size, *unbatched_shape_raw))
+    named_inputs = {'raw': image_raw}
+    expected_shape_raw = unbatched_shape_raw[1:] + unbatched_shape_raw[:1]
+
     @typechecked
     def draw_function(array: np.ndarray, named_data: Dict[str, Any]) -> np.ndarray:
-        assert array.shape == (10, 20, 3)
+        assert array.shape == expected_shape_raw
         assert set(named_data.keys()) == {'stage', 'raw', 'processed', 'embeddings'}
         return array
 
     brick_collection_as_dict = {
         'preprocessor': BrickModule(model=nn.Identity(), input_names=['raw'], output_names=['processed']),
         'backbone': BrickModule(model=nn.Identity(), input_names=['processed'], output_names=['embeddings']),
-        'visualizer': BrickUnbatched(callable=draw_function, input_names=['raw', '__all__'], output_names=['visualized']),
+        'visualizer': BrickPerImageProcessing(callable=draw_function, input_names=input_names, output_names=['visualized'],
+                                              unpack_type_functions=bricks.UNPACK_TENSORS_TO_NDARRAYS),
     }
 
-    batch_size = 5
+
     model = BrickCollection(brick_collection_as_dict)
-    outputs = model(named_inputs={'raw': torch.rand((batch_size, 3, 10, 20))}, stage=Stage.INFERENCE)
+    outputs = model(named_inputs=named_inputs, stage=Stage.INFERENCE)
     assert len(outputs['visualized']) == batch_size
-    assert outputs['visualized'][0].shape == (10, 20, 3)
+    assert outputs['visualized'][0].shape == expected_shape_raw
     assert set(outputs) == {'raw', 'processed', 'embeddings', 'visualized', 'stage'}
 
-def test_brick_tensor_as_arrays_two_output_names():
+
+@pytest.mark.parametrize('input_names', [['raw', 'processed'], {'tensor': 'processed', 'array0': 'raw'}])
+def test_brick_per_image_processing_two_output_names_skip_unpack_functions_for(input_names):
+    batch_size = 5
+    unbatched_shape_raw = (3, 20, 20)
+    image_raw = torch.rand((batch_size, *unbatched_shape_raw))
+    expected_shape_raw = unbatched_shape_raw[1:] + unbatched_shape_raw[:1]
+
+    unbatched_shape_processed = (3, 10, 20)
+    image_processed = torch.rand((batch_size, *unbatched_shape_processed))
+    expected_shape_processed = image_processed.shape # Expect original unbatched shape
+    named_inputs = {'raw': image_raw,  'processed': image_processed}
+
+
     @typechecked
-    def draw_function(array0: np.ndarray, array1: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        assert array0.shape == (10, 20, 3)
-        assert array1.shape == (10, 20, 3)
-        return array0, array1
+    def draw_function(array0: np.ndarray, tensor: torch.Tensor) -> Tuple[np.ndarray, torch.Tensor]:
+        assert array0.shape == expected_shape_raw
+        assert tensor.shape == expected_shape_processed
+        return array0, tensor
+
 
     brick_collection_as_dict = {
-        'preprocessor': BrickModule(model=nn.Identity(), input_names=['raw'], output_names=['processed']),
         'backbone': BrickModule(model=nn.Identity(), input_names=['processed'], output_names=['embeddings']),
-        'visualizer': BrickUnbatched(callable=draw_function, input_names=['raw', 'processed'],
-                                     output_names=['visualized0', 'visualized1']),
+        'visualizer': BrickPerImageProcessing(callable=draw_function, input_names=input_names,
+                                     output_names=['visualized0', 'visualized1'],
+                                     unpack_type_functions=bricks.UNPACK_TENSORS_TO_NDARRAYS,
+                                     skip_unpack_functions_for=['processed']),
     }
 
-    batch_size = 5
+
     model = BrickCollection(brick_collection_as_dict)
-    outputs = model(named_inputs={'raw': torch.rand((batch_size, 3, 10, 20))}, stage=Stage.INFERENCE)
+    outputs = model(named_inputs=named_inputs, stage=Stage.INFERENCE)
     assert len(outputs['visualized0']) == batch_size
     assert len(outputs['visualized1']) == batch_size
-    assert outputs['visualized0'][0].shape == (10, 20, 3)
-    assert outputs['visualized1'][0].shape == (10, 20, 3)
+    assert outputs['visualized0'][0].shape == expected_shape_raw
+    assert outputs['visualized1'][0].shape == expected_shape_processed
 
-@pytest.mark.parametrize(['permute_tensors', 'tensors_to_numpy'], [(False, False), (True, False), (True, True), (False, True)])
-def test_brick_tensor_as_arrays_two_output_names_params(permute_tensors, tensors_to_numpy):
+
+@pytest.mark.parametrize('input_names', [['raw', 'processed'], {'tensor1': 'processed', 'tensor0': 'raw'}])
+def test_brick_per_image_processing_two_output_names_no_torch_to_numpy_unpacking(input_names):
+    batch_size = 5
+    unbatched_shape_raw = (3, 20, 20)
+    image_raw = torch.rand((batch_size, *unbatched_shape_raw))
+    expected_shape_raw = unbatched_shape_raw
+
+    unbatched_shape_processed = (3, 10, 20)
+    image_processed = torch.rand((batch_size, *unbatched_shape_processed))
+    expected_shape_processed = image_processed.shape # Expect original unbatched shape
+    named_inputs = {'raw': image_raw,  'processed': image_processed}
+
     @typechecked
-    def draw_function(array0, arrays: np.ndarray):
-        assert arrays.shape == (10, 20, 3)  # List of arrays should be untouched by the function for all cases
-        return array0
+    def draw_function(tensor0: torch.Tensor, tensor1: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        assert tensor0.shape == expected_shape_raw
+        assert tensor1.shape == expected_shape_processed
+        return tensor0, tensor1
+
 
     brick_collection_as_dict = {
-        'visualizer': BrickUnbatched(callable=draw_function, input_names=['raw', 'arrays'], output_names=['visualized0'],
-                                     permute_tensors=permute_tensors, tensors_to_numpy=tensors_to_numpy)
-        }
+        'backbone': BrickModule(model=nn.Identity(), input_names=['processed'], output_names=['embeddings']),
+        'visualizer': BrickPerImageProcessing(callable=draw_function, input_names=input_names,
+                                     output_names=['visualized0', 'visualized1'],
+                                     unpack_type_functions=bricks.UNPACK_NO_CONVERSION,
+                                     skip_unpack_functions_for=['processed']),
+    }
 
-    batch_size = 5
+
     model = BrickCollection(brick_collection_as_dict)
-    list_of_arrays = [np.random.random((10, 20, 3)) for _ in range(batch_size)]
-    outputs = model(named_inputs={'raw': torch.rand((batch_size, 3, 10, 20)), 'arrays': list_of_arrays}, stage=Stage.INFERENCE)
-
+    outputs = model(named_inputs=named_inputs, stage=Stage.INFERENCE)
     assert len(outputs['visualized0']) == batch_size
-    single_image = outputs['visualized0'][0]
-    if tensors_to_numpy:
-        assert isinstance(single_image, np.ndarray)
-    else:
-        assert isinstance(single_image, torch.Tensor)
-    actual_shape = single_image.shape
-    if permute_tensors:
-        assert actual_shape == (10, 20, 3)
-    else:
-        assert actual_shape == (3, 10, 20)
+    assert len(outputs['visualized1']) == batch_size
+    assert outputs['visualized0'][0].shape == expected_shape_raw
+    assert outputs['visualized1'][0].shape == expected_shape_processed
+
 
 def test_resolve_relative_names_errors():
     bricks = {
