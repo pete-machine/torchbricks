@@ -5,18 +5,19 @@ import pytest
 import torch
 import torchbricks.brick_visualizer
 from PIL import Image, ImageDraw, ImageFont
-from torch import nn
 from torchbricks.brick_visualizer import BrickPerImageProcessing
-from torchbricks.bricks import BrickCollection, BrickModule, Stage
+from torchbricks.bricks import Stage
 from torchbricks.tensor_operations import unpack_batched_tensor_to_pillow_image
 from typeguard import typechecked
+from utils_testing.utils_testing import path_repo_root
 
 
 def test_draw_image_classification():
     def draw_image_classification(input_image: Image.Image, target_name: str) -> Image.Image:
         """Draws image classification results"""
         draw = ImageDraw.Draw(input_image)
-        font = ImageFont.truetype('tests/data/font_ASMAN.TTF', 50)
+        path_font = path_repo_root() / 'tests/data/font_ASMAN.TTF'
+        font = ImageFont.truetype(str(path_font), 50)
         draw.text((25, 25), text=target_name, font = font, align ='left')
         return input_image
 
@@ -26,13 +27,11 @@ def test_draw_image_classification():
             super().__init__(callable=draw_image_classification, input_names=[input_image, target_name], output_names=[output_name],
                              input_name_unpack_functions={input_image: unpack_batched_tensor_to_pillow_image})
 
-    bricks = {
-        'visualizer': BrickDrawImageClassification(input_image='input_image', target_name='target', output_name='visualization')
-    }
 
     batched_inputs = {'input_image': torch.zeros((2, 3, 100, 200)), 'target': ['cat', 'dog']}
-    brick_collection = BrickCollection(bricks)
-    brick_collection(named_inputs=batched_inputs, stage=Stage.INFERENCE)
+
+    brick_vis = BrickDrawImageClassification(input_image='input_image', target_name='target', output_name='visualization')
+    brick_vis(named_inputs=batched_inputs, stage=Stage.INFERENCE)
 
 
 @pytest.mark.parametrize('input_names', [['raw', '__all__'], {'named_data': '__all__', 'array': 'raw'}])
@@ -46,23 +45,32 @@ def test_brick_per_image_processing_single_output_name(input_names):
     @typechecked
     def draw_function(array: np.ndarray, named_data: Dict[str, Any]) -> np.ndarray:
         assert array.shape == expected_shape_raw
-        assert set(named_data.keys()) == {'stage', 'raw', 'processed', 'embeddings'}
+        assert set(named_data.keys()) == {'stage', 'raw'}
         return array
 
-    brick_collection_as_dict = {
-        'preprocessor': BrickModule(model=nn.Identity(), input_names=['raw'], output_names=['processed']),
-        'backbone': BrickModule(model=nn.Identity(), input_names=['processed'], output_names=['embeddings']),
-        'visualizer': BrickPerImageProcessing(callable=draw_function, input_names=input_names, output_names=['visualized'],
-                                              type_unpack_functions=torchbricks.brick_visualizer.UNPACK_TENSORS_TO_NDARRAYS),
-    }
+    brick = BrickPerImageProcessing(callable=draw_function, input_names=input_names, output_names=['visualized'],
+                            type_unpack_functions=torchbricks.brick_visualizer.UNPACK_TENSORS_TO_NDARRAYS)
 
-
-    model = BrickCollection(brick_collection_as_dict)
-    outputs = model(named_inputs=named_inputs, stage=Stage.INFERENCE)
+    outputs = brick(named_inputs=named_inputs, stage=Stage.INFERENCE)
     assert len(outputs['visualized']) == batch_size
     assert outputs['visualized'][0].shape == expected_shape_raw
-    assert set(outputs) == {'raw', 'processed', 'embeddings', 'visualized', 'stage'}
+    assert set(outputs) == {'visualized'}
 
+def test_brick_per_image_batch_size_not_the_same():
+    def identity(x, y):
+        return x+y
+
+    brick = BrickPerImageProcessing(callable=identity, input_names=['in0', 'in1'], output_names=['out'])
+    with pytest.raises(ValueError, match='Batch size is not the same for all inputs'):
+        brick(named_inputs={'in0': torch.ones((3, 100)), 'in1': torch.ones((2, 20))}, stage=Stage.INFERENCE)
+
+def test_brick_per_image_cannot_estimate_batch_size():
+    def identity(x, y):
+        return x+y
+
+    brick = BrickPerImageProcessing(callable=identity, input_names=['in0', 'in1'], output_names=['out'])
+    with pytest.raises(ValueError, match='Can not estimate batch size from these inputs'):
+        brick(named_inputs={'in0': {}, 'in1': {}}, stage=Stage.INFERENCE)
 
 @pytest.mark.parametrize('input_names', [['raw', 'processed'], {'tensor': 'processed', 'array0': 'raw'}])
 def test_brick_per_image_processing_two_output_names_skip_unpack_functions_for(input_names):
@@ -84,16 +92,10 @@ def test_brick_per_image_processing_two_output_names_skip_unpack_functions_for(i
         return array0, tensor
 
 
-    brick_collection_as_dict = {
-        'backbone': BrickModule(model=nn.Identity(), input_names=['processed'], output_names=['embeddings']),
-        'visualizer': BrickPerImageProcessing(callable=draw_function, input_names=input_names,
+    model = BrickPerImageProcessing(callable=draw_function, input_names=input_names,
                                      output_names=['visualized0', 'visualized1'],
                                      type_unpack_functions=torchbricks.brick_visualizer.UNPACK_TENSORS_TO_NDARRAYS,
-                                     input_name_unpack_functions={'processed': None}),
-    }
-
-
-    model = BrickCollection(brick_collection_as_dict)
+                                     input_name_unpack_functions={'processed': None})
     outputs = model(named_inputs=named_inputs, stage=Stage.INFERENCE)
     assert len(outputs['visualized0']) == batch_size
     assert len(outputs['visualized1']) == batch_size
@@ -119,17 +121,10 @@ def test_brick_per_image_processing_two_output_names_no_torch_to_numpy_unpacking
         assert tensor1.shape == expected_shape_processed
         return tensor0, tensor1
 
-
-    brick_collection_as_dict = {
-        'backbone': BrickModule(model=nn.Identity(), input_names=['processed'], output_names=['embeddings']),
-        'visualizer': BrickPerImageProcessing(callable=draw_function, input_names=input_names,
+    model = BrickPerImageProcessing(callable=draw_function, input_names=input_names,
                                      output_names=['visualized0', 'visualized1'],
                                      type_unpack_functions=torchbricks.brick_visualizer.UNPACK_NO_CONVERSION,
-                                     input_name_unpack_functions={'processed': None}),
-    }
-
-
-    model = BrickCollection(brick_collection_as_dict)
+                                     input_name_unpack_functions={'processed': None})
     outputs = model(named_inputs=named_inputs, stage=Stage.INFERENCE)
     assert len(outputs['visualized0']) == batch_size
     assert len(outputs['visualized1']) == batch_size

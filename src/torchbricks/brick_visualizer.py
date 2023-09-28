@@ -10,15 +10,14 @@ from torchbricks.bricks_helper import name_callable_outputs
 from torchbricks.tensor_operations import unpack_batched_tensor_to_numpy_channel_last_arrays
 
 UNPACK_NO_CONVERSION = {
-    torch.Tensor: list,
-    np.ndarray: list, # Unpack as list only
+    torch.Tensor: list, # Unpack as list only [B, C, H, W] -> [C, H, W]
+    np.ndarray: list, # Unpack as list only [B, H, W, C] -> [H, W, C]
 }
 
 UNPACK_TENSORS_TO_NDARRAYS = {
     torch.Tensor: unpack_batched_tensor_to_numpy_channel_last_arrays,
     np.ndarray: list,  # Unpack as list only
 }
-
 
 @typechecked
 class BrickPerImageProcessing(BrickModule):
@@ -131,6 +130,3 @@ class BrickPerImageProcessing(BrickModule):
                 outputs_per_image[output_name].append(output)
 
         return tuple(outputs_per_image.values())
-
-    def get_module_name(self) -> str:
-        return self.callable.__name__
