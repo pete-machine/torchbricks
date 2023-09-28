@@ -10,7 +10,7 @@ help:
 .PHONY: show
 show: ## Show the current environment.
 	@echo "Current environment:"
-	@mamba info
+	@micromamba info
 
 .PHONY: lint
 lint: ## Perform linting on all files using pre-commit
@@ -18,13 +18,13 @@ lint: ## Perform linting on all files using pre-commit
 
 .PHONY: install
 install: ## create environment using lock-file
-	mamba create --name torchbricks --file conda-linux-64.lock
+	micromamba create --name torchbricks --file conda-linux-64.lock
 
 
 .PHONY: update-lock-file
 update-lock-file: ## Update lock file using the specification in 'environment.yml'
 	@set -e
-	conda-lock -k explicit --conda mamba -f environment.yml
+	conda-lock -k explicit --conda micromamba -f environment.yml
 	cp environment.yml tests/data/copy_lock_filed_environment.yml
 
 

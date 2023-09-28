@@ -408,7 +408,10 @@ the default.
 ```python
 from pathlib import Path
 from torchbricks.brick_utils import export_bricks_as_onnx
-path_onnx = Path("build/readme_model.onnx")
+path_build = Path("build")
+path_build.mkdir(exist_ok=True)
+path_onnx = path_build / "readme_model.onnx"
+
 export_bricks_as_onnx(path_onnx=path_onnx, 
                       brick_collection=brick_collection, 
                       named_inputs=named_inputs, 
@@ -589,10 +592,7 @@ trainer = pl.Trainer(max_epochs=1, limit_train_batches=2, limit_val_batches=2, l
 ```
 
 
-
-
-
-## Brick features: Pass all intermediate tensors to Brick
+### Brick features: Pass all intermediate tensors to Brick
 By adding `'__all__'` to `input_names`, it is possible to access all tensors as a dictionary inside a brick module. 
 For production code, this may not be the best option, but this feature can be valuable during an exploration phase or 
 when doing some live debugging of a new model/module. 
@@ -621,7 +621,7 @@ brick_collection = BrickCollection(bricks)
 named_outputs = brick_collection(named_inputs={'raw': torch.rand((2, 3, 100, 200))}, stage=Stage.INFERENCE)
 ```
 
-## Brick features: Using Stage Inside Module
+### Brick features: Using Stage Inside Module
 By passing in `stage` in `input_names` it is possible to change the program flow. 
 
 As demonstrated below want to alway resize the input to a specific size when the model is being exported.
@@ -643,6 +643,52 @@ assert list(named_outputs["processed"].shape[2:]) == [50, 100]
 
 named_outputs = brick_collection(named_inputs=named_inputs, stage=Stage.VALIDATION)
 assert list(named_outputs["processed"].shape[2:]) == [100, 200]
+```
+
+### Brick features: Visualizations in TorchBricks
+We provide `BrickPerImageProcessing` as base brick for doing visualizations in a brick collection. 
+The advantage of brick-based visualization is that it can be bundled together with a specific task/head. 
+
+The challenge that `BrickPerImageProcessing` tries addresses is that drawing and visualization functions typically 
+operate on per image basis and operates on non-`torch.Tensor` data types. 
+E.g. Opencv uses `np.array` and pillow using `Image`. 
+
+The goal of `BrickPerImageProcessing` is to convert batched tensors/data to per image data in desired type
+and pass it to a draw function. Look up the documentation of `BrickPerImageProcessing` to see all options.
+
+Below we will show how it may use pillow draw functions: 
+
+
+```python
+
+from PIL import Image, ImageDraw, ImageFont
+from torchbricks.brick_visualizer import BrickPerImageProcessing
+from torchbricks.tensor_operations import unpack_batched_tensor_to_pillow_image
+
+
+def draw_image_classification(input_image: Image.Image, target_name: str) -> Image.Image:
+    """Draws image classification results"""
+    draw = ImageDraw.Draw(input_image) 
+    font = ImageFont.truetype('tests/data/font_ASMAN.TTF', 50) 
+    draw.text((25, 25), text=target_name, font = font, align ="left") 
+    return input_image
+
+
+class BrickDrawImageClassification(BrickPerImageProcessing):
+    def __init__(self, input_image: str, target_name: str, output_name: str):
+        super().__init__(callable=draw_image_classification, input_names=[input_image, target_name], output_names=[output_name],
+                         input_name_unpack_functions={input_image: unpack_batched_tensor_to_pillow_image})
+
+
+bricks = {
+    'visualizer': BrickDrawImageClassification(input_image="input_image", target_name="target", output_name="visualization")
+}
+
+batched_inputs = {'input_image': torch.zeros((2, 3, 100, 200)), 'target': ['cat', 'dog']}
+brick_collection = BrickCollection(bricks)
+outputs = brick_collection(named_inputs=batched_inputs, stage=Stage.INFERENCE)
+
+display(outputs["visualization"][0],  outputs["visualization"][1])
 ```
 
 
