@@ -7,16 +7,16 @@ from typeguard import typechecked
 
 from torchbricks.bricks import BrickModule, Stage, use_default_style
 from torchbricks.bricks_helper import name_callable_outputs
-from torchbricks.tensor_operations import unpack_batched_tensor_to_numpy_channel_last_arrays
+from torchbricks.tensor_conversions import unpack_batched_array_to_arrays, unpack_batched_tensor_to_numpy_format
 
 UNPACK_NO_CONVERSION = {
     torch.Tensor: list, # Unpack as list only [B, C, H, W] -> [C, H, W]
-    np.ndarray: list, # Unpack as list only [B, H, W, C] -> [H, W, C]
+    np.ndarray: unpack_batched_array_to_arrays, # Unpack as list only [B, H, W, C] -> [H, W, C]
 }
 
 UNPACK_TENSORS_TO_NDARRAYS = {
-    torch.Tensor: unpack_batched_tensor_to_numpy_channel_last_arrays,
-    np.ndarray: list,  # Unpack as list only
+    torch.Tensor: unpack_batched_tensor_to_numpy_format,
+    np.ndarray: unpack_batched_array_to_arrays,  # Unpack as list only
 }
 
 @typechecked
@@ -32,9 +32,9 @@ class BrickPerImageProcessing(BrickModule):
     def __init__(self, callable: Callable,
                  input_names: Union[List[str], Dict[str, str]],
                  output_names: List[str],
-                 type_unpack_functions: Optional[Dict[type, Optional[Callable]]] = None,
+                 unpack_functions_for_type: Optional[Dict[type, Optional[Callable]]] = None,
                  alive_stages: Union[List[Stage], str, None] = None,
-                 input_name_unpack_functions: Optional[Dict[str, Optional[Callable]]] = None,
+                 unpack_functions_for_input_name: Optional[Dict[str, Optional[Callable]]] = None,
                  ):
         """
         Parameters
@@ -68,10 +68,10 @@ class BrickPerImageProcessing(BrickModule):
                          calculate_gradients=False,
                          trainable=False)
 
-        self.type_unpack_functions = type_unpack_functions or UNPACK_TENSORS_TO_NDARRAYS
+        self.type_unpack_functions = unpack_functions_for_type or UNPACK_TENSORS_TO_NDARRAYS
         self.callable = callable
 
-        self.input_name_unpack_functions = input_name_unpack_functions or {}
+        self.input_name_unpack_functions = unpack_functions_for_input_name or {}
         input_names_list = self.input_names_as_list()
         input_names_to_unpack = list(self.input_name_unpack_functions)
         assert set(input_names_to_unpack).issubset(input_names_list), (f'One or more {input_names_to_unpack=} is not an ',

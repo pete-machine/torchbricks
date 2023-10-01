@@ -649,46 +649,89 @@ assert list(named_outputs["processed"].shape[2:]) == [100, 200]
 We provide `BrickPerImageProcessing` as base brick for doing visualizations in a brick collection. 
 The advantage of brick-based visualization is that it can be bundled together with a specific task/head. 
 
-The challenge that `BrickPerImageProcessing` tries addresses is that drawing and visualization functions typically 
-operate on per image basis and operates on non-`torch.Tensor` data types. 
-E.g. Opencv uses `np.array` and pillow using `Image`. 
+Visualization/drawing functions typically operate on a single image and on non-`torch.Tensor` data types.
+E.g. Opencv/matplotlib uses `np.array` and pillow using `Image`. 
 
-The goal of `BrickPerImageProcessing` is to convert batched tensors/data to per image data in desired type
+(Torchvision actually has functions to draw rectangles, key-points and segmentation masks directly on `torch.Tensor`s -
+but it still operates on a single image and it has no option for rendering text). 
+
+The goal of `BrickPerImageProcessing` is to convert batched tensors/data to per image data in a desired format
 and pass it to a draw function. Look up the documentation of `BrickPerImageProcessing` to see all options.
 
 Below we will show how it may use pillow draw functions: 
 
-
 ```python
 
 from PIL import Image, ImageDraw, ImageFont
+import numpy as np
 from torchbricks.brick_visualizer import BrickPerImageProcessing
-from torchbricks.tensor_operations import unpack_batched_tensor_to_pillow_image
+from torchbricks.tensor_conversions import float2uint8
 
 
-def draw_image_classification(input_image: Image.Image, target_name: str) -> Image.Image:
+CLASS_NAMES = ['cat', 'dog']
+def draw_image_classification(input_image: np.ndarray, target_prediction: np.ndarray) -> Image.Image:
     """Draws image classification results"""
-    draw = ImageDraw.Draw(input_image) 
+    assert input_image.shape == (100, 200, 3)  # Converted to single image channel last numpy array
+    image = Image.fromarray(float2uint8(input_image))
+    draw = ImageDraw.Draw(image) 
     font = ImageFont.truetype('tests/data/font_ASMAN.TTF', 50) 
-    draw.text((25, 25), text=target_name, font = font, align ="left") 
-    return input_image
-
-
-class BrickDrawImageClassification(BrickPerImageProcessing):
-    def __init__(self, input_image: str, target_name: str, output_name: str):
-        super().__init__(callable=draw_image_classification, input_names=[input_image, target_name], output_names=[output_name],
-                         input_name_unpack_functions={input_image: unpack_batched_tensor_to_pillow_image})
+    draw.text((25, 25), text=CLASS_NAMES[target_prediction[0]], font = font) 
+    return image
 
 
 bricks = {
-    'visualizer': BrickDrawImageClassification(input_image="input_image", target_name="target", output_name="visualization")
+    'visualizer': BrickPerImageProcessing(callable=draw_image_classification, 
+                                          input_names=["input_image", "target"], 
+                                          output_names=["visualization"])
 }
 
-batched_inputs = {'input_image': torch.zeros((2, 3, 100, 200)), 'target': ['cat', 'dog']}
+batched_inputs = {'input_image': torch.zeros((2, 3, 100, 200)), 'target': torch.tensor([0, 1], dtype=torch.int64)}
 brick_collection = BrickCollection(bricks)
 outputs = brick_collection(named_inputs=batched_inputs, stage=Stage.INFERENCE)
 
 display(outputs["visualization"][0],  outputs["visualization"][1])
+```
+
+In above example, `BrickPerImageProcessing` will automatically convert 
+a batch tensor of shape [B, C, H, W] to a channel last numpy image of shape [H, W, C]. 
+This is the default setting. However for `BrickPerImageProcessing` a user has the option of 
+both specifying how specific types are converted with `unpack_functions_for_type={TYPE: CALLABLE}`
+or specific input_names `unpack_functions_for_input_name={INPUT_NAME: CALLABLE}`.
+
+
+Below we will use this functionality to convert torch tensors directly to pillow and make a child class `BrickVisualizeImageClassification` 
+to simplify the interface for making image classification visualizations.
+
+```python
+from typing import List
+from torchbricks.tensor_conversions import unpack_batched_tensor_to_pillow_images, function_composer, torch_to_numpy
+
+
+class BrickVisualizeImageClassification(BrickPerImageProcessing):
+    def __init__(self, input_image: str, target_name: str, class_names: List[str], output_name: str):
+        self.class_names = class_names
+        super().__init__(callable=self.visualize_image_classification_pillow, input_names=[input_image, target_name], output_names=[output_name],
+                         unpack_functions_for_type={torch.Tensor: unpack_batched_tensor_to_pillow_images},
+                         unpack_functions_for_input_name={target_name: function_composer(torch_to_numpy, list)})
+
+    def visualize_image_classification_pillow(self, image: Image.Image, target_prediction: np.int64) -> Image.Image:
+        """Draws image classification results"""
+        draw = ImageDraw.Draw(image) 
+        font = ImageFont.truetype('tests/data/font_ASMAN.TTF', 50) 
+        draw.text((25, 25), text=self.class_names[target_prediction], font = font) 
+        return image
+
+
+visualizer = BrickVisualizeImageClassification(input_image="input_image", target_name="target", class_names=["cat", "dog"],
+                                               output_name="VisualizeImageClassification")
+batched_inputs = {'input_image': torch.zeros((2, 3, 100, 200)), 'target': torch.tensor([0, 1], dtype=torch.int64)}
+visualizer(batched_inputs, stage=Stage.INFERENCE)
+```
+
+With a simplified interface, we now have a general function for 
+
+```python
+
 ```
 
 
@@ -733,9 +776,11 @@ MISSING
       We will the have a test checking if the copy and the current version of `environment.yml` is the same.
 - [x] Add code coverage and tests passed badges to readme again
 - [x] Create brick-collection visualization tool ("mermaid?")
-- [x] Make DAG like functionality to check if a inputs and outputs works for all model stages.
+- [x] Make DAG like functionality to check if inputs and outputs works for all model stages.
+- [x] Make Base Module PerImageProcessing as the basis for doing visualizations. 
+  - [ ] Consider caching unpacked data
+- [ ] Demonstrate model configuration with hydra
 - [ ] Make common Visualizations with pillow - not opencv to not blow up the required dependencies. ImageClassification, Segmentation, ObjectDetection
-  - [ ] Maybe visualizations should be done in OpenCV it is faster. 
   - [ ] VideoModule to store data as a video
   - [ ] DisplayModule to show data
 - [ ] Multiple named tensors caching module. 
@@ -745,7 +790,7 @@ MISSING
   - Minor Cons: State gets hidden away - implicit instead of explicit.
   - Minor Pros: Similar to eval/training 
 - [ ] Collection of helper modules. Preprocessors, Backbones, Necks/Upsamplers, ImageClassification, SemanticSegmentation, ObjectDetection
-  - [ ] All the modules in the README should be easy to import as actually modules.
+  - [x] All the modules in the README should be easy to import as actually modules.
   - [ ] Make common brick collections: BricksImageClassification, BricksSegmentation, BricksPointDetection, BricksObjectDetection
 - [ ] Support preparing data in the dataloader?
 - [ ] Support torch.jit.scripting? 

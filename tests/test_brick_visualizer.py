@@ -7,7 +7,7 @@ import torchbricks.brick_visualizer
 from PIL import Image, ImageDraw, ImageFont
 from torchbricks.brick_visualizer import BrickPerImageProcessing
 from torchbricks.bricks import Stage
-from torchbricks.tensor_operations import unpack_batched_tensor_to_pillow_image
+from torchbricks.tensor_conversions import unpack_batched_tensor_to_pillow_images
 from typeguard import typechecked
 from utils_testing.utils_testing import path_repo_root
 
@@ -25,7 +25,7 @@ def test_draw_image_classification():
     class BrickDrawImageClassification(BrickPerImageProcessing):
         def __init__(self, input_image: str, target_name: str, output_name: str):
             super().__init__(callable=draw_image_classification, input_names=[input_image, target_name], output_names=[output_name],
-                             input_name_unpack_functions={input_image: unpack_batched_tensor_to_pillow_image})
+                             unpack_functions_for_input_name={input_image: unpack_batched_tensor_to_pillow_images})
 
 
     batched_inputs = {'input_image': torch.zeros((2, 3, 100, 200)), 'target': ['cat', 'dog']}
@@ -49,7 +49,7 @@ def test_brick_per_image_processing_single_output_name(input_names):
         return array
 
     brick = BrickPerImageProcessing(callable=draw_function, input_names=input_names, output_names=['visualized'],
-                            type_unpack_functions=torchbricks.brick_visualizer.UNPACK_TENSORS_TO_NDARRAYS)
+                            unpack_functions_for_type=torchbricks.brick_visualizer.UNPACK_TENSORS_TO_NDARRAYS)
 
     outputs = brick(named_inputs=named_inputs, stage=Stage.INFERENCE)
     assert len(outputs['visualized']) == batch_size
@@ -62,7 +62,7 @@ def test_brick_per_image_batch_size_not_the_same():
 
     brick = BrickPerImageProcessing(callable=identity, input_names=['in0', 'in1'], output_names=['out'])
     with pytest.raises(ValueError, match='Batch size is not the same for all inputs'):
-        brick(named_inputs={'in0': torch.ones((3, 100)), 'in1': torch.ones((2, 20))}, stage=Stage.INFERENCE)
+        brick(named_inputs={'in0': torch.ones((3, 100)), 'in1': torch.ones((2, 100))}, stage=Stage.INFERENCE)
 
 def test_brick_per_image_cannot_estimate_batch_size():
     def identity(x, y):
@@ -94,8 +94,8 @@ def test_brick_per_image_processing_two_output_names_skip_unpack_functions_for(i
 
     model = BrickPerImageProcessing(callable=draw_function, input_names=input_names,
                                      output_names=['visualized0', 'visualized1'],
-                                     type_unpack_functions=torchbricks.brick_visualizer.UNPACK_TENSORS_TO_NDARRAYS,
-                                     input_name_unpack_functions={'processed': None})
+                                     unpack_functions_for_type=torchbricks.brick_visualizer.UNPACK_TENSORS_TO_NDARRAYS,
+                                     unpack_functions_for_input_name={'processed': None})
     outputs = model(named_inputs=named_inputs, stage=Stage.INFERENCE)
     assert len(outputs['visualized0']) == batch_size
     assert len(outputs['visualized1']) == batch_size
@@ -123,8 +123,8 @@ def test_brick_per_image_processing_two_output_names_no_torch_to_numpy_unpacking
 
     model = BrickPerImageProcessing(callable=draw_function, input_names=input_names,
                                      output_names=['visualized0', 'visualized1'],
-                                     type_unpack_functions=torchbricks.brick_visualizer.UNPACK_NO_CONVERSION,
-                                     input_name_unpack_functions={'processed': None})
+                                     unpack_functions_for_type=torchbricks.brick_visualizer.UNPACK_NO_CONVERSION,
+                                     unpack_functions_for_input_name={'processed': None})
     outputs = model(named_inputs=named_inputs, stage=Stage.INFERENCE)
     assert len(outputs['visualized0']) == batch_size
     assert len(outputs['visualized1']) == batch_size
