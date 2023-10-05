@@ -5,7 +5,7 @@ import pytest
 import torch
 import torchbricks.brick_visualizer
 from PIL import Image, ImageDraw, ImageFont
-from torchbricks.brick_visualizer import BrickPerImageProcessing
+from torchbricks.brick_visualizer import BrickPerImageVisualization
 from torchbricks.bricks import Stage
 from torchbricks.tensor_conversions import unpack_batched_tensor_to_pillow_images
 from typeguard import typechecked
@@ -22,7 +22,7 @@ def test_draw_image_classification():
         return input_image
 
 
-    class BrickDrawImageClassification(BrickPerImageProcessing):
+    class BrickDrawImageClassification(BrickPerImageVisualization):
         def __init__(self, input_image: str, target_name: str, output_name: str):
             super().__init__(callable=draw_image_classification, input_names=[input_image, target_name], output_names=[output_name],
                              unpack_functions_for_input_name={input_image: unpack_batched_tensor_to_pillow_images})
@@ -48,7 +48,7 @@ def test_brick_per_image_processing_single_output_name(input_names):
         assert set(named_data.keys()) == {'stage', 'raw'}
         return array
 
-    brick = BrickPerImageProcessing(callable=draw_function, input_names=input_names, output_names=['visualized'],
+    brick = BrickPerImageVisualization(callable=draw_function, input_names=input_names, output_names=['visualized'],
                             unpack_functions_for_type=torchbricks.brick_visualizer.UNPACK_TENSORS_TO_NDARRAYS)
 
     outputs = brick(named_inputs=named_inputs, stage=Stage.INFERENCE)
@@ -60,7 +60,7 @@ def test_brick_per_image_batch_size_not_the_same():
     def identity(x, y):
         return x+y
 
-    brick = BrickPerImageProcessing(callable=identity, input_names=['in0', 'in1'], output_names=['out'])
+    brick = BrickPerImageVisualization(callable=identity, input_names=['in0', 'in1'], output_names=['out'])
     with pytest.raises(ValueError, match='Batch size is not the same for all inputs'):
         brick(named_inputs={'in0': torch.ones((3, 100)), 'in1': torch.ones((2, 100))}, stage=Stage.INFERENCE)
 
@@ -68,7 +68,7 @@ def test_brick_per_image_cannot_estimate_batch_size():
     def identity(x, y):
         return x+y
 
-    brick = BrickPerImageProcessing(callable=identity, input_names=['in0', 'in1'], output_names=['out'])
+    brick = BrickPerImageVisualization(callable=identity, input_names=['in0', 'in1'], output_names=['out'])
     with pytest.raises(ValueError, match='Can not estimate batch size from these inputs'):
         brick(named_inputs={'in0': {}, 'in1': {}}, stage=Stage.INFERENCE)
 
@@ -92,7 +92,7 @@ def test_brick_per_image_processing_two_output_names_skip_unpack_functions_for(i
         return array0, tensor
 
 
-    model = BrickPerImageProcessing(callable=draw_function, input_names=input_names,
+    model = BrickPerImageVisualization(callable=draw_function, input_names=input_names,
                                      output_names=['visualized0', 'visualized1'],
                                      unpack_functions_for_type=torchbricks.brick_visualizer.UNPACK_TENSORS_TO_NDARRAYS,
                                      unpack_functions_for_input_name={'processed': None})
@@ -121,7 +121,7 @@ def test_brick_per_image_processing_two_output_names_no_torch_to_numpy_unpacking
         assert tensor1.shape == expected_shape_processed
         return tensor0, tensor1
 
-    model = BrickPerImageProcessing(callable=draw_function, input_names=input_names,
+    model = BrickPerImageVisualization(callable=draw_function, input_names=input_names,
                                      output_names=['visualized0', 'visualized1'],
                                      unpack_functions_for_type=torchbricks.brick_visualizer.UNPACK_NO_CONVERSION,
                                      unpack_functions_for_input_name={'processed': None})

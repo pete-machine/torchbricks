@@ -20,7 +20,7 @@ UNPACK_TENSORS_TO_NDARRAYS = {
 }
 
 @typechecked
-class BrickPerImageProcessing(BrickModule):
+class BrickPerImageVisualization(BrickModule):
     """
     Primarily used to visualize data per image.
     The callable-function is called for each image in the batch and the outputs are collected in a list.

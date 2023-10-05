@@ -27,8 +27,8 @@ TorchBricks builds pytorch models using small reuseable and decoupled parts - we
 The concept is simple and flexible and allows you to more easily combine, add or swap out parts of the model 
 (preprocessor, backbone, neck, head or post-processor), change the task or extend it with multiple tasks.
 
-TorchBricks also serves as a compact recipe on both how model parts are connected and when parts are executed 
-during model stages such as training, validation, testing, inference, export and potentially other stages. 
+TorchBricks is a compact recipe on both *how* model parts are connected and *when* parts are executed 
+during model stages such as training, validation, testing, inference and export.
 
 <!-- #region -->
 
@@ -43,7 +43,7 @@ pip install torchbricks
 
 To demonstrate the the concepts of TorchBricks, we will first specify some dummy parts used of a regular image recognition model: 
 A preprocessor, a backbone and a head (in this case a classifier).
-*Note: Don't worry about the actually implementation of these modules -they are just dummy examples.*
+*Note: Don't worry about the actually implementation of these modules - they are just dummy examples.*
 
 ```python
 from typing import Tuple, Any
@@ -87,7 +87,7 @@ from torchbricks.graph_plotter import create_mermaid_dag_graph
 
 bricks = {
     'preprocessor': BrickNotTrainable(PreprocessorDummy(), 
-                                      input_names=['raw'], 
+                                      input_names=['raw_images'], 
                                       output_names=['processed']),
     'backbone': BrickTrainable(TinyModel(n_channels=3, n_features=10), 
                                input_names=['processed'], 
@@ -105,7 +105,7 @@ Input and output names specifies how outputs of one module is passed to inputs o
 
 Finally, the dictionary of bricks is passed to a `BrickCollection`. 
 
-Below we visualize how the brick collection connects the different bricks together. 
+Below we visualize how the brick collection connects bricks together. 
 
 
 ```mermaid
@@ -116,7 +116,7 @@ flowchart LR
     head("<strong>BrickTrainable</strong><br><strong>head</strong>: ClassifierDummy"):::BrickTrainable
     
     %% Draw input and outputs
-    raw:::input --> preprocessor
+    raw_images:::input --> preprocessor
     
     %% Draw nodes and edges
     preprocessor --> |processed| backbone
@@ -141,14 +141,18 @@ flowchart LR
 *We provide the `create_mermaid_dag_graph`-function to create a brick collection visualization*
 
 
-The `BrickCollection` is used for executing above graph using a dictionary as input.
+The `BrickCollection` is used for executing above graph using `named_inputs`. 
+`named_inputs` is simply a dictionary with input name as key and input data as value.
+
+For above brick collection, we only expect one named input called `raw_images`. 
 
 ```python
 batch_size=2
-batch_images = torch.rand((batch_size, 3, 100, 200))
-named_outputs = brick_collection(named_inputs={'raw': batch_images}, stage=Stage.INFERENCE)
+batched_images = torch.rand((batch_size, 3, 100, 200))
+named_inputs = {'raw_images': batched_images}
+named_outputs = brick_collection(named_inputs=named_inputs, stage=Stage.INFERENCE)
 print("Brick outputs:", named_outputs.keys())
-# Brick outputs: dict_keys(['raw', 'stage', 'processed', 'embedding', 'logits', 'softmaxed'])
+# Brick outputs: dict_keys(['raw_images', 'stage', 'processed', 'embedding', 'logits', 'softmaxed'])
 ```
 
 The brick collection accepts a dictionary and returns a dictionary with all intermediated and resulting tensors. 
@@ -171,14 +175,16 @@ Leading us to the next section
 
 
 ## Concept 2: Bricks can be dead (or alive)
-The second concept is to specify when bricks are alive - meaning we specify at which stages (train, test, validation, inference and export) 
-a brick is active. 
+The second concept is to specify when bricks are alive - meaning we can specify at which stages (train, test, validation, inference 
+and export) a brick is active. 
 
 For other stage the brick will play dead - do nothing / return an empty dictionary. 
 
-Meaning that for different `stages`, we will have the option of creating a unique DAG for each model stage. 
+Meaning that for different `stages`, we will have the option of creating a unique DAG for each model stage and
+we can control how a brick collection acts during all stages of a model. 
 
-In above example this is not particular interesting - because preprocessor, backbone model and head would typically be alive in all stages. 
+In above example this is not very interesting - because a model will mostly have preprocessor, backbone and head active 
+during all stages.
 
 So we will demonstrate by adding a loss brick (`BrickLoss`) and specifying `alive_stages` for each brick.
 
@@ -186,7 +192,7 @@ So we will demonstrate by adding a loss brick (`BrickLoss`) and specifying `aliv
 num_classes = 3
 bricks = {
     'preprocessor': BrickNotTrainable(PreprocessorDummy(), 
-                                      input_names=['raw'], 
+                                      input_names=['raw_images'], 
                                       output_names=['processed'], 
                                       alive_stages="all"),
     'backbone': BrickTrainable(TinyModel(n_channels=num_classes, n_features=10), 
@@ -206,7 +212,7 @@ brick_collection = BrickCollection(bricks)
 
 print(brick_collection)
 # BrickCollection(
-#   (preprocessor): BrickNotTrainable(PreprocessorDummy, input_names=['raw'], output_names=['processed'], alive_stages=['TRAIN', 'VALIDATION', 'TEST', 'INFERENCE', 'EXPORT'])
+#   (preprocessor): BrickNotTrainable(PreprocessorDummy, input_names=['raw_images'], output_names=['processed'], alive_stages=['TRAIN', 'VALIDATION', 'TEST', 'INFERENCE', 'EXPORT'])
 #   (backbone): BrickTrainable(TinyModel, input_names=['processed'], output_names=['embedding'], alive_stages=['TRAIN', 'VALIDATION', 'TEST', 'INFERENCE', 'EXPORT'])
 #   (head): BrickTrainable(ClassifierDummy, input_names=['embedding'], output_names=['logits', 'softmaxed'], alive_stages=['TRAIN', 'VALIDATION', 'TEST', 'INFERENCE', 'EXPORT'])
 #   (loss): BrickLoss(CrossEntropyLoss, input_names=['logits', 'targets'], output_names=['loss_ce'], alive_stages=['TRAIN', 'VALIDATION', 'TEST'])
@@ -223,7 +229,9 @@ stages.
 
 
 **Graph during inference and export:**
-During `Stage.INFERENCE` and `Stage.EXPORT`, the loss modules is dead and note only `raw` is required as input:
+
+During `Stage.INFERENCE` and `Stage.EXPORT`, the graph will look as before, the loss modules is dead and note only `raw_images` is 
+still the only required input
 
 
 
@@ -236,7 +244,7 @@ flowchart LR
     head("<strong>BrickTrainable</strong><br><strong>head</strong>: ClassifierDummy"):::BrickTrainable
     
     %% Draw input and outputs
-    raw:::input --> preprocessor
+    raw_images:::input --> preprocessor
     
     %% Draw nodes and edges
     preprocessor --> |processed| backbone
@@ -262,7 +270,7 @@ flowchart LR
 
 **Graph during train, test and validation:**
 
-During `Stage.TRAIN`, `Stage.VALIDATION` and `Stage.TEST`, the loss module is alive and note both `raw` and `targets` are required as inputs:
+During `Stage.TRAIN`, `Stage.VALIDATION` and `Stage.TEST`, the loss module is alive and note both `raw_images` and `targets` are required as inputs:
 
 
 
@@ -276,7 +284,7 @@ flowchart LR
     loss("<strong>BrickLoss</strong><br><strong>loss</strong>: CrossEntropyLoss"):::BrickLoss
     
     %% Draw input and outputs
-    raw:::input --> preprocessor
+    raw_images:::input --> preprocessor
     targets:::input --> loss
     
     %% Draw nodes and edges
@@ -303,9 +311,24 @@ flowchart LR
 
 
 
-## Bricks for model training
+As demonstrated in above example, we can easily change the required inputs by change the model stage.
+That allows us to support two basic use cases:
+
+1) When labels/targets are available, we have the option of getting model prediction along with loss and metrics.
+
+2) When labels/targets are **not** available, we will only do basic model predictions. 
+
+The mechanism of activating different parts of the model and making loss, metrics and visualizations part of the model recipe, 
+allows us to more easily investigate/debug/visualize model parts in a notebook or scratch scripts.
+
+
+## Brick features: 
+
+
+
+### Brick feature: TorchMetrics
 **We are not creating a training framework**, but to easily use the brick collection in your favorite training framework or custom 
-training/validation/test loop, we need the final piece: **Calculating model metrics** 
+training/validation/test loop, we need the option of **calculating model metrics** 
 
 To easily inject both model, losses and metrics, we also need to easily support metrics and calculate metrics across a dataset. 
 We will extend our example from before by adding metric bricks. 
@@ -343,21 +366,28 @@ brick_collection = BrickCollection(bricks)
 ```
 
 We will now use the brick collection above to simulate how a user can iterate over a dataset and 
-calling the brick for each batch 
+pass batches to the brick collection.
 
 ```python
-for i_batch in range(5): # Simulates iterating over the dataset
-    named_inputs = {"raw": batch_images, "targets": torch.ones((batch_size), dtype=torch.int64)}
+# Simulate dataloader
+named_input_simulated = {"raw": batched_images, "targets": torch.ones((batch_size), dtype=torch.int64)}
+dataloader_simulated = [named_input_simulated for _ in range(5)]
+
+# Loop over the dataset
+for named_inputs in dataloader_simulated: # Simulates iterating over the dataset
     named_outputs = brick_collection(named_inputs=named_inputs, stage=Stage.TRAIN)
 
 metrics = brick_collection.summarize(stage=Stage.TRAIN, reset=True)
-print(f"{metrics=}, {named_outputs.keys()=}")
+print(f"{named_outputs.keys()=}")
+# named_outputs.keys()=dict_keys(['raw', 'targets', 'stage', 'normalized', 'features', 'logits', 'probabilities', 'class_prediction', 'loss_ce'])
+print(f"{metrics=}")
+# metrics={'MulticlassAccuracy': tensor(0.)}
 ```
 
 For each iteration in our (simulated) dataset, we calculate model outputs, losses and metrics for each batch. 
 Unlike other bricks, `BrickMetrics` will not (by default) output metrics for each batch. 
 Instead metrics are stored internally in `BrickMetricSingle` and only aggregated and return when
-the `summarize` function is called. In above example the aggregated metric over over 5 batches.
+the `summarize` function is called. In above example, metric is aggregated over 5 batches as summaries to a single value. 
 
 It is important to note that we set `reset=True` to reset the internal aggregation of metrics.  
 
@@ -375,54 +405,12 @@ To also pass metrics to other bricks, you can set `return_metrics=True` for `Bri
 But be aware, this will add computational cost. 
 
 
-## Bricks motivation (to be continued)
-
-The main motivation:
-- 
-- Each brick can return whatever - they are not forced to only returning e.g. logits... If you want the model backbone embeddings
-  you can do that to. 
-- Avoid modules within modules within modules to created models that are combined. 
-- Not flexible. It is possible to make the first encode/decode model... But adding a preprocessor, swapping out a backbone,
-  adding additional heads or necks and sharing computations will typically not be easy. I ended up creating multiple modules that are
-  called within other modules... All head/modules pass dictionaries between modules. 
-- Typically not very reusable. 
-- By packing model modules, metrics and loss-functions into a brick collection, we can more easily 
-inject any desired brick collection into your custom trainer without doing modifications to the trainer.
-
-Including metrics and losses with the model. 
-- Model, metrics and losses are connected. If we want to add an additional head to a model - we should also add losses and metrics. 
-- The typical distinction between `encode`  / `decoder` becomes to limited... Multiple decoders might share a `neck`.
-
-
-## Brick features: 
-
-
-
-### Brick features: Export as ONNX
-To export a brick collection as onnx we provide the `export_bricks_as_onnx`-function. 
-
-Pass an example input (`named_input`) to trace a brick collection.
-Set `dynamic_batch_size=True` to support any batch size inputs and here we explicitly set `stage=Stage.EXPORT` - this is also 
-the default.
-
-```python
-from pathlib import Path
-from torchbricks.brick_utils import export_bricks_as_onnx
-path_build = Path("build")
-path_build.mkdir(exist_ok=True)
-path_onnx = path_build / "readme_model.onnx"
-
-export_bricks_as_onnx(path_onnx=path_onnx, 
-                      brick_collection=brick_collection, 
-                      named_inputs=named_inputs, 
-                      dynamic_batch_size=True, 
-                      stage=Stage.EXPORT)
-```
-
 ### Brick features: Act as a nn.Module
 A brick collection acts as a 'nn.Module' meaning:
 
 ```python
+from pathlib import Path
+
 # Move to specify device (CPU/GPU) or precision to automatically move model parameters
 brick_collection.to(torch.float16)
 brick_collection.to(torch.float32)
@@ -434,8 +422,13 @@ torch.save(brick_collection.state_dict(), path_model)
 # Load model parameters
 brick_collection.load_state_dict(torch.load(path_model))
 
-# Access parameters
-brick_collection.named_parameters()
+# Iterate all parameters
+for name, params in brick_collection.named_parameters():
+    pass
+
+# Iterate all layers
+for name, module in brick_collection.named_modules():
+    pass
 
 # Using compile with pytorch >= 2.0
 torch.compile(brick_collection)
@@ -445,12 +438,8 @@ torch.compile(brick_collection)
 To more easily add, remove and swap out a subset of bricks in a brick collection (e.g. bricks related to specific task), we
 support passing a nested dictionary of bricks to a `BrickCollection` and using relative input and output names. 
 
-Both nested dictionaries and relative input and output names are demonstrated below by adding multiple classifications 
-heads (`head0` and `head1`) to a brick collection. Each classification head is created with `create_image_classification_head`. 
-
-Note also that the function uses relative names such as `./logits`, `./probabilities`, `./class_prediction` and `./loss_ce`. 
-Relative names will use the brick name to derive "absolute" names. E.g. for `head0` the relative input name `./logits` 
-becomes `head0/logits` and for `head1` the relative input name `./logits`  becomes `head1/logits`
+First we create a function (`create_image_classification_head`) that returns a dictionary with image classification specific 
+bricks. 
 
 ```python
 from typing import Dict
@@ -472,21 +461,37 @@ def create_image_classification_head(num_classes: int, in_channels: int, feature
     }
     return head
 
+```
+
+We now create the full model containing a `preprocessor`, `backbone` and two independent heads called `head0` and `head1`.
+Each head is a dictionary of bricks, making our brick collection a nested dictionary. 
+
+```python
+
 n_features = resnet_brick.model.n_backbone_features
 bricks = {
     'preprocessor': BrickNotTrainable(Preprocessor(), 
                                       input_names=['raw'], 
                                       output_names=['normalized']),
     'backbone': resnet_brick,
-    'head0': create_image_classification_head(num_classes=3, in_channels=n_features, features_name='features', targets_name='targets'),
-    'head1': create_image_classification_head(num_classes=5, in_channels=n_features, features_name='features', targets_name='targets'),
+    'head0': create_image_classification_head(num_classes=3, in_channels=n_features, features_name='features', targets_name='targets0'),
+    'head1': create_image_classification_head(num_classes=5, in_channels=n_features, features_name='features', targets_name='targets1'),
 }
 brick_collections = BrickCollection(bricks)
 print(brick_collections)
 print(create_mermaid_dag_graph(brick_collections))
 ```
 
-Mermaid visualization of above graph: 
+Also demonstrated in above example is the use of relative input and output names. 
+Looking at our `create_image_classification_head` function again, you will notice that we actually use of relative input and output names 
+(`./logits`, `./probabilities`, `./class_prediction` and `./loss_ce`). 
+
+Relative names will use the brick name to derive "absolute" names. E.g. for `head0` the relative 
+input name `./logits` becomes `head0/logits` and for `head1` the relative input name `./logits`  becomes `head1/logits`.
+
+We visualize above graph: 
+
+
 ```mermaid
 flowchart LR
     %% Brick definitions
@@ -501,10 +506,10 @@ flowchart LR
     
     %% Draw input and outputs
     raw:::input --> preprocessor
-    targets:::input --> head0/accuracy
-    targets:::input --> head0/loss
-    targets:::input --> head1/accuracy
-    targets:::input --> head1/loss
+    targets0:::input --> head0/accuracy
+    targets0:::input --> head0/loss
+    targets1:::input --> head1/accuracy
+    targets1:::input --> head1/loss
     
     %% Draw nodes and edges
     preprocessor --> |normalized| backbone
@@ -539,6 +544,26 @@ flowchart LR
     end
 ```
 
+
+### Brick features: Export as ONNX
+To export a brick collection as onnx we provide the `export_bricks_as_onnx`-function. 
+
+Pass an example input (`named_input`) to trace a brick collection.
+Set `dynamic_batch_size=True` to support any batch size inputs and here we explicitly set `stage=Stage.EXPORT` - this is also 
+the default.
+
+```python
+from torchbricks.brick_utils import export_bricks_as_onnx
+path_build = Path("build")
+path_build.mkdir(exist_ok=True)
+path_onnx = path_build / "readme_model.onnx"
+
+export_bricks_as_onnx(path_onnx=path_onnx, 
+                      brick_collection=brick_collection, 
+                      named_inputs=named_inputs, 
+                      dynamic_batch_size=True, 
+                      stage=Stage.EXPORT)
+```
 
 ### Brick features: Bag of bricks - reusable bricks modules
 Note also in above example we use bag-of-bricks to import commonly used `nn.Module`s 
@@ -646,43 +671,54 @@ assert list(named_outputs["processed"].shape[2:]) == [100, 200]
 ```
 
 ### Brick features: Visualizations in TorchBricks
-We provide `BrickPerImageProcessing` as base brick for doing visualizations in a brick collection. 
+We provide `BrickPerImageVisualization` as base brick for doing visualizations in a brick collection. 
 The advantage of brick-based visualization is that it can be bundled together with a specific task/head. 
 
 Visualization/drawing functions typically operate on a single image and on non-`torch.Tensor` data types.
 E.g. Opencv/matplotlib uses `np.array` and pillow using `Image`. 
 
 (Torchvision actually has functions to draw rectangles, key-points and segmentation masks directly on `torch.Tensor`s -
-but it still operates on a single image and it has no option for rendering text). 
+but it still operates on a single image and it has no option for rendering text).
 
-The goal of `BrickPerImageProcessing` is to convert batched tensors/data to per image data in a desired format
-and pass it to a draw function. Look up the documentation of `BrickPerImageProcessing` to see all options.
+The goal of `BrickPerImageVisualization` is to convert batched tensors/data to per image data in a desired format
+and pass it to a draw function. Look up the documentation of `BrickPerImageVisualization` to see all options.
 
-Below we will show how it may use pillow draw functions: 
+First we create a callable to do per image visualizations. It can be a simple function, but in this example we create a callable 
+class to pass in class names and initialize font. 
+
+The callable visualizes image classification predictions using pillow and requires two `np.array`s as input: 
+`input_image` of shape [H, W, C] and `target_prediction` [1].
 
 ```python
 
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
-from torchbricks.brick_visualizer import BrickPerImageProcessing
 from torchbricks.tensor_conversions import float2uint8
 
+class VisualizeImageClassification:
+    def __init__(self, class_names: list, font_size: int = 50):
+        self.class_names = class_names
+        self.font = ImageFont.truetype('tests/data/font_ASMAN.TTF', size=font_size) 
 
-CLASS_NAMES = ['cat', 'dog']
-def draw_image_classification(input_image: np.ndarray, target_prediction: np.ndarray) -> Image.Image:
-    """Draws image classification results"""
-    assert input_image.shape == (100, 200, 3)  # Converted to single image channel last numpy array
-    image = Image.fromarray(float2uint8(input_image))
-    draw = ImageDraw.Draw(image) 
-    font = ImageFont.truetype('tests/data/font_ASMAN.TTF', 50) 
-    draw.text((25, 25), text=CLASS_NAMES[target_prediction[0]], font = font) 
-    return image
+    def __call__(self, input_image: np.ndarray, target_prediction: np.ndarray) -> Image.Image:
+        """Draws image classification results"""
+        assert input_image.ndim == 3 # Converted to single image channel last numpy array [H, W, C]
+        image = Image.fromarray(float2uint8(input_image))
+        draw = ImageDraw.Draw(image) 
+        draw.text((25, 25), text=self.class_names[target_prediction[0]], font = self.font) 
+        return image
+```
 
+Our new drawing class `VisualizeImageClassification` is not passed to `BrickPerImageVisualization` and used in a brick collection.
 
+```python
+
+from torchbricks.brick_visualizer import BrickPerImageVisualization
 bricks = {
-    'visualizer': BrickPerImageProcessing(callable=draw_image_classification, 
+    'visualizer': BrickPerImageVisualization(callable=VisualizeImageClassification(class_names=["cat", "dog"]), 
                                           input_names=["input_image", "target"], 
-                                          output_names=["visualization"])
+                                          output_names=["visualization"],
+                                          alive_stages=[Stage.INFERENCE])
 }
 
 batched_inputs = {'input_image': torch.zeros((2, 3, 100, 200)), 'target': torch.tensor([0, 1], dtype=torch.int64)}
@@ -692,24 +728,29 @@ outputs = brick_collection(named_inputs=batched_inputs, stage=Stage.INFERENCE)
 display(outputs["visualization"][0],  outputs["visualization"][1])
 ```
 
-In above example, `BrickPerImageProcessing` will automatically convert 
-a batch tensor of shape [B, C, H, W] to a channel last numpy image of shape [H, W, C]. 
-This is the default setting. However for `BrickPerImageProcessing` a user has the option of 
-both specifying how specific types are converted with `unpack_functions_for_type={TYPE: CALLABLE}`
-or specific input_names `unpack_functions_for_input_name={INPUT_NAME: CALLABLE}`.
+`BrickPerImageProcessing` will by default convert a batch tensor of shape [B, C, H, W] to a channel last numpy image of shape [H, W, C]. 
+This is the default behavior, and it allows us in the callable of `VisualizeImageClassification` to operate directly on numpy arrays. 
+
+However for `BrickPerImageProcessing` a user has the option for unpacking batch data in a desired way as we will demonstrate in the 
+next example.
 
 
-Below we will use this functionality to convert torch tensors directly to pillow and make a child class `BrickVisualizeImageClassification` 
-to simplify the interface for making image classification visualizations.
+Below we create a class that inherits `BrickPerImageVisualization` to create a brick for visualizing
+image classification `BrickVisualizeImageClassification`. The functionality is similar to above, but demonstrate 
+other options of the `BrickPerImageVisualization` class. 
+
+*It is important to note that `visualize_image_classification_pillow` is passed as a callable, and we do not override functionality of 
+`BrickPerImageVisualization`. We only use it to simplify the constructor of `BrickVisualizeImageClassification`.
 
 ```python
 from typing import List
 from torchbricks.tensor_conversions import unpack_batched_tensor_to_pillow_images, function_composer, torch_to_numpy
 
 
-class BrickVisualizeImageClassification(BrickPerImageProcessing):
+class BrickVisualizeImageClassification(BrickPerImageVisualization):
     def __init__(self, input_image: str, target_name: str, class_names: List[str], output_name: str):
         self.class_names = class_names
+        self.font = ImageFont.truetype('tests/data/font_ASMAN.TTF', 50) 
         super().__init__(callable=self.visualize_image_classification_pillow, input_names=[input_image, target_name], output_names=[output_name],
                          unpack_functions_for_type={torch.Tensor: unpack_batched_tensor_to_pillow_images},
                          unpack_functions_for_input_name={target_name: function_composer(torch_to_numpy, list)})
@@ -717,8 +758,8 @@ class BrickVisualizeImageClassification(BrickPerImageProcessing):
     def visualize_image_classification_pillow(self, image: Image.Image, target_prediction: np.int64) -> Image.Image:
         """Draws image classification results"""
         draw = ImageDraw.Draw(image) 
-        font = ImageFont.truetype('tests/data/font_ASMAN.TTF', 50) 
-        draw.text((25, 25), text=self.class_names[target_prediction], font = font) 
+
+        draw.text((25, 25), text=self.class_names[target_prediction], font = self.font) 
         return image
 
 
@@ -728,11 +769,46 @@ batched_inputs = {'input_image': torch.zeros((2, 3, 100, 200)), 'target': torch.
 visualizer(batched_inputs, stage=Stage.INFERENCE)
 ```
 
-With a simplified interface, we now have a general function for 
+Not unlike before, the callable (here `visualize_image_classification_pillow`) accepts an `Image.Image` image and an `int64` value directly
+and we are not required to do conversions inside the drawing function. 
 
-```python
+This can be achieved by using the two input arguments: 
+- `unpack_functions_for_type: Dict[Type, Callable]` specifying how each type should be unpacked.
+  In above example we use `unpack_functions_for_type={torch.Tensor: unpack_batched_tensor_to_pillow_images}` to unpack all `torch.Tensor`s 
+  of shape [B, 3, H, W] as pillow images.
+- `unpack_functions_for_input_name: Dict[str, Callable]` specifies how a specific input name should be unpacked. 
+  In above example we use `unpack_functions_for_input_name={target_name: function_composer(torch_to_numpy, list)}` to unpack a 
+  `torch.Tensor` of shape [B] to one int64 value per image. 
 
-```
+Specifying unpacking by input name (`unpack_functions_for_input_name`) will override the per type unpacking of `unpack_functions_for_type`. 
+
+
+## Motivation
+
+The main motivation:
+- Sharable models: Packing model parts, metrics, loss-functions and visualization into a single recipe, makes the model more sharable to
+  other projects and supports sharing model for different use cases such as: Only inference, inference+visualizations and 
+  training+metrics+losses.
+- Shareable Parts: The brick collection encourage users to decouples parts and making also each part more sharable. 
+- Multiple tasks: Makes it easier to add and remove tasks. Each task can be expressed by model parts in a dictionary, we can easily add/remove them to a brick collection. 
+- By packing model modules, metrics, loss-functions and visualization into a single brick collection, we can more easily 
+  inject it into your custom trainer and evaluation without doing per task/model modifications. 
+- Your model is **not** required to only return logits. Some training frameworks expect you to only return logits - values that go into 
+  your loss function. Then at inference/test/evaluation you need to do post processing or pass additional outputs to 
+  calculate metrics, do visualizations and make prediction human interpretable. It encourage unclear control flow (if/else statements) 
+  in the model that depends on model stage. 
+- Using input and output names makes it easier to describe how parts are connected. Internally data is passed between bricks in a 
+  dictionary of any type - making in flexible. But for each module, you can specific and check types hints for input and output data to 
+  both improve readability and more production ready. 
+- When I started making a framework suited for multiple tasks, I would passed dictionaries around to all modules and pull out tensors by
+  name in modules. Changing names would break stuff and it was not production ready. I also started using the typical 
+  backbone(encoder) / head(decoder) separation... But some heads may share a common neck. The decoder might also take different inputs and
+  split into different representation and merge again... Also to avoid code duplication, I ended up during 
+  multiple layers of inheritance for the decoder, making reuse bad and generally everything became too complicated and a new task would 
+  require me to refactor the whole concept. Yes, it was probably not a super great attempt either, but it made me realize it should be 
+  easier to make a new task and it should be easier to reuse parts. 
+
+
 
 
 ## Why should I explicitly set the train, val or test stage
