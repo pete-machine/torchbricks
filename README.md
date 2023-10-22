@@ -41,7 +41,7 @@ pip install torchbricks
 
 ## Bricks by example
 
-To demonstrate the the concepts of TorchBricks, we will first specify some dummy parts used of a regular image recognition model: 
+To demonstrate the the concepts of TorchBricks, we will first specify some dummy parts used in a regular image recognition model: 
 A preprocessor, a backbone and a head (in this case a classifier).
 *Note: Don't worry about the actually implementation of these modules - they are just dummy examples.*
 
@@ -97,11 +97,15 @@ bricks = {
                            output_names=['logits', "softmaxed"]),
 }
 brick_collection = BrickCollection(bricks)
+# print(create_mermaid_dag_graph(brick_collection))
 print(brick_collection)
 ```
 
 Each module is placed in a dictionary with a unique name and wrapped inside a brick with input and output names. 
 Input and output names specifies how outputs of one module is passed to inputs of the next module. 
+
+In above example, we use `BrickNotTrainable` to wrap modules that are shouldn't be trained (weights are fixed) and 
+`BrickTrainable` to wrap modules that are trainable (weights are updated on each training iteration). 
 
 Finally, the dictionary of bricks is passed to a `BrickCollection`. 
 
@@ -111,9 +115,9 @@ Below we visualize how the brick collection connects bricks together.
 ```mermaid
 flowchart LR
     %% Brick definitions
-    preprocessor("<strong>BrickNotTrainable</strong><br><strong>preprocessor</strong>: PreprocessorDummy"):::BrickNotTrainable
-    backbone("<strong>BrickTrainable</strong><br><strong>backbone</strong>: TinyModel"):::BrickTrainable
-    head("<strong>BrickTrainable</strong><br><strong>head</strong>: ClassifierDummy"):::BrickTrainable
+    preprocessor(<strong>'preprocessor': PreprocessorDummy</strong><br><i>BrickNotTrainable</i>):::BrickNotTrainable
+    backbone(<strong>'backbone': TinyModel</strong><br><i>BrickTrainable</i>):::BrickTrainable
+    head(<strong>'head': ClassifierDummy</strong><br><i>BrickTrainable</i>):::BrickTrainable
     
     %% Draw input and outputs
     raw_images:::input --> preprocessor
@@ -121,8 +125,8 @@ flowchart LR
     %% Draw nodes and edges
     preprocessor --> |processed| backbone
     backbone --> |embedding| head
-    head --> softmaxed:::output
     head --> logits:::output
+    head --> softmaxed:::output
     
     %% Add styling
     classDef arrow stroke-width:0px,fill-opacity:0.0 
@@ -141,8 +145,7 @@ flowchart LR
 *We provide the `create_mermaid_dag_graph`-function to create a brick collection visualization*
 
 
-The `BrickCollection` is used for executing above graph using `named_inputs`. 
-`named_inputs` is simply a dictionary with input name as key and input data as value.
+The `BrickCollection` is used for executing above graph by passing a dictionary with named input data (`named_inputs`). 
 
 For above brick collection, we only expect one named input called `raw_images`. 
 
@@ -176,12 +179,7 @@ Leading us to the next section
 
 ## Concept 2: Bricks can be dead (or alive)
 The second concept is to specify when bricks are alive - meaning we can specify at which stages (train, test, validation, inference 
-and export) a brick is active. 
-
-For other stage the brick will play dead - do nothing / return an empty dictionary. 
-
-Meaning that for different `stages`, we will have the option of creating a unique DAG for each model stage and
-we can control how a brick collection acts during all stages of a model. 
+and export) a brick is active.
 
 In above example this is not very interesting - because a model will mostly have preprocessor, backbone and head active 
 during all stages.
@@ -227,50 +225,10 @@ For `loss` we set `alive_stages=[Stage.TRAIN, Stage.VALIDATION, Stage.TEST]` to 
 stages. 
 
 
-
-**Graph during inference and export:**
-
-During `Stage.INFERENCE` and `Stage.EXPORT`, the graph will look as before, the loss modules is dead and note only `raw_images` is 
-still the only required input
-
-
-
-
-```mermaid
-flowchart LR
-    %% Brick definitions
-    preprocessor("<strong>BrickNotTrainable</strong><br><strong>preprocessor</strong>: PreprocessorDummy"):::BrickNotTrainable
-    backbone("<strong>BrickTrainable</strong><br><strong>backbone</strong>: TinyModel"):::BrickTrainable
-    head("<strong>BrickTrainable</strong><br><strong>head</strong>: ClassifierDummy"):::BrickTrainable
-    
-    %% Draw input and outputs
-    raw_images:::input --> preprocessor
-    
-    %% Draw nodes and edges
-    preprocessor --> |processed| backbone
-    backbone --> |embedding| head
-    head --> softmaxed:::output
-    head --> logits:::output
-    
-    %% Add styling
-    classDef arrow stroke-width:0px,fill-opacity:0.0 
-    classDef input stroke-width:0px,fill-opacity:0.3,fill:#22A699 
-    classDef output stroke-width:0px,fill-opacity:0.3,fill:#F2BE22 
-    classDef BrickNotTrainable stroke-width:0px,fill:#B56576 
-    classDef BrickTrainable stroke-width:0px,fill:#6D597A 
-    
-    %% Add legends
-    subgraph Legends
-        input(input):::input
-        output(output):::output
-        
-    end
-```
-
-
 **Graph during train, test and validation:**
 
-During `Stage.TRAIN`, `Stage.VALIDATION` and `Stage.TEST`, the loss module is alive and note both `raw_images` and `targets` are required as inputs:
+During `Stage.TRAIN`, `Stage.VALIDATION` and `Stage.TEST`, the loss module is alive and note now that 
+both `raw_images` and `targets` are required as inputs:
 
 
 
@@ -278,10 +236,10 @@ During `Stage.TRAIN`, `Stage.VALIDATION` and `Stage.TEST`, the loss module is al
 ```mermaid
 flowchart LR
     %% Brick definitions
-    preprocessor("<strong>BrickNotTrainable</strong><br><strong>preprocessor</strong>: PreprocessorDummy"):::BrickNotTrainable
-    backbone("<strong>BrickTrainable</strong><br><strong>backbone</strong>: TinyModel"):::BrickTrainable
-    head("<strong>BrickTrainable</strong><br><strong>head</strong>: ClassifierDummy"):::BrickTrainable
-    loss("<strong>BrickLoss</strong><br><strong>loss</strong>: CrossEntropyLoss"):::BrickLoss
+    preprocessor(<strong>'preprocessor': PreprocessorDummy</strong><br><i>BrickNotTrainable</i>):::BrickNotTrainable
+    backbone(<strong>'backbone': TinyModel</strong><br><i>BrickTrainable</i>):::BrickTrainable
+    head(<strong>'head': ClassifierDummy</strong><br><i>BrickTrainable</i>):::BrickTrainable
+    loss(<strong>'loss': CrossEntropyLoss</strong><br><i>BrickLoss</i>):::BrickLoss
     
     %% Draw input and outputs
     raw_images:::input --> preprocessor
@@ -311,12 +269,51 @@ flowchart LR
 
 
 
+**Graph during inference and export:**
+
+During `Stage.INFERENCE` and `Stage.EXPORT`, the graph will look as before, the loss modules is dead and note that `raw_images` is 
+the only required input
+
+
+
+
+```mermaid
+flowchart LR
+    %% Brick definitions
+    preprocessor(<strong>'preprocessor': PreprocessorDummy</strong><br><i>BrickNotTrainable</i>):::BrickNotTrainable
+    backbone(<strong>'backbone': TinyModel</strong><br><i>BrickTrainable</i>):::BrickTrainable
+    head(<strong>'head': ClassifierDummy</strong><br><i>BrickTrainable</i>):::BrickTrainable
+    
+    %% Draw input and outputs
+    raw_images:::input --> preprocessor
+    
+    %% Draw nodes and edges
+    preprocessor --> |processed| backbone
+    backbone --> |embedding| head
+    head --> logits:::output
+    head --> softmaxed:::output
+    
+    %% Add styling
+    classDef arrow stroke-width:0px,fill-opacity:0.0 
+    classDef input stroke-width:0px,fill-opacity:0.3,fill:#22A699 
+    classDef output stroke-width:0px,fill-opacity:0.3,fill:#F2BE22 
+    classDef BrickNotTrainable stroke-width:0px,fill:#B56576 
+    classDef BrickTrainable stroke-width:0px,fill:#6D597A 
+    
+    %% Add legends
+    subgraph Legends
+        input(input):::input
+        output(output):::output
+    end
+```
+
+
 As demonstrated in above example, we can easily change the required inputs by change the model stage.
 That allows us to support two basic use cases:
 
 1) When labels/targets are available, we have the option of getting model prediction along with loss and metrics.
 
-2) When labels/targets are **not** available, we will only do basic model predictions. 
+2) When labels/targets are **not** available, we do only model predictions used for model inference/export.
 
 The mechanism of activating different parts of the model and making loss, metrics and visualizations part of the model recipe, 
 allows us to more easily investigate/debug/visualize model parts in a notebook or scratch scripts.
@@ -365,8 +362,7 @@ bricks = {
 brick_collection = BrickCollection(bricks)
 ```
 
-We will now use the brick collection above to simulate how a user can iterate over a dataset and 
-pass batches to the brick collection.
+We will now use the brick collection above to simulate how a user can iterate over a dataset.
 
 ```python
 # Simulate dataloader
@@ -376,6 +372,7 @@ dataloader_simulated = [named_input_simulated for _ in range(5)]
 # Loop over the dataset
 for named_inputs in dataloader_simulated: # Simulates iterating over the dataset
     named_outputs = brick_collection(named_inputs=named_inputs, stage=Stage.TRAIN)
+    named_outputs_losses_only = brick_collection.extract_losses(named_outputs=named_outputs)
 
 metrics = brick_collection.summarize(stage=Stage.TRAIN, reset=True)
 print(f"{named_outputs.keys()=}")
@@ -385,6 +382,10 @@ print(f"{metrics=}")
 ```
 
 For each iteration in our (simulated) dataset, we calculate model outputs, losses and metrics for each batch. 
+
+Losses are calculated and returned in `named_outputs` together with other model outputs. 
+We provide `extract_losses` as simple function to filter `named_outputs` and only return losses in a new dictionary. 
+
 Unlike other bricks, `BrickMetrics` will not (by default) output metrics for each batch. 
 Instead metrics are stored internally in `BrickMetricSingle` and only aggregated and return when
 the `summarize` function is called. In above example, metric is aggregated over 5 batches as summaries to a single value. 
@@ -495,14 +496,14 @@ We visualize above graph:
 ```mermaid
 flowchart LR
     %% Brick definitions
-    preprocessor("<strong>BrickNotTrainable</strong><br><strong>preprocessor</strong>: Preprocessor"):::BrickNotTrainable
-    backbone("<strong>BrickTrainable</strong><br><strong>backbone</strong>: BackboneResnet"):::BrickTrainable
-    head0/classify("<strong>BrickTrainable</strong><br><strong>head0/classify</strong>: ImageClassifier"):::BrickTrainable
-    head0/accuracy("<strong>BrickMetricSingle</strong><br><strong>head0/accuracy</strong>: ['MulticlassAccuracy']"):::BrickMetricSingle
-    head0/loss("<strong>BrickLoss</strong><br><strong>head0/loss</strong>: CrossEntropyLoss"):::BrickLoss
-    head1/classify("<strong>BrickTrainable</strong><br><strong>head1/classify</strong>: ImageClassifier"):::BrickTrainable
-    head1/accuracy("<strong>BrickMetricSingle</strong><br><strong>head1/accuracy</strong>: ['MulticlassAccuracy']"):::BrickMetricSingle
-    head1/loss("<strong>BrickLoss</strong><br><strong>head1/loss</strong>: CrossEntropyLoss"):::BrickLoss
+    preprocessor(<strong>'preprocessor': Preprocessor</strong><br><i>BrickNotTrainable</i>):::BrickNotTrainable
+    backbone(<strong>'backbone': BackboneResnet</strong><br><i>BrickTrainable</i>):::BrickTrainable
+    head0/classify(<strong>'head0/classify': ImageClassifier</strong><br><i>BrickTrainable</i>):::BrickTrainable
+    head0/accuracy(<strong>'head0/accuracy': 'MulticlassAccuracy'</strong><br><i>BrickMetricSingle</i>):::BrickMetricSingle
+    head0/loss(<strong>'head0/loss': CrossEntropyLoss</strong><br><i>BrickLoss</i>):::BrickLoss
+    head1/classify(<strong>'head1/classify': ImageClassifier</strong><br><i>BrickTrainable</i>):::BrickTrainable
+    head1/accuracy(<strong>'head1/accuracy': 'MulticlassAccuracy'</strong><br><i>BrickMetricSingle</i>):::BrickMetricSingle
+    head1/loss(<strong>'head1/loss': CrossEntropyLoss</strong><br><i>BrickLoss</i>):::BrickLoss
     
     %% Draw input and outputs
     raw:::input --> preprocessor
@@ -622,7 +623,7 @@ By adding `'__all__'` to `input_names`, it is possible to access all tensors as 
 For production code, this may not be the best option, but this feature can be valuable during an exploration phase or 
 when doing some live debugging of a new model/module. 
 
-We will demonstrate in code by introducing a (dummy) module `VisualizeRawAndPreprocessed`.
+We will demonstrate in code by introducing a (dummy) module `MyNewPostProcessor`.
 
 *Note: It is just a dummy class, don't worry to much about the actual implementation.*
 
@@ -630,17 +631,17 @@ The important thing to notice is that `input_names = ['__all__']` is used for ou
 pass all tensors as a dictionary as an argument in the forward call. 
 
 ```python
-class VisualizeRawAndPreprocessed(torch.nn.Module):
+class MyNewPostProcessor(torch.nn.Module):
     def forward(self, named_inputs: Dict[str, Any]):
         ## Here `named_inputs` contains all intermediate tensors
-        image_raw_and_preprocessed = torch.concatenate((named_inputs["raw"], named_inputs["preprocessed"]), dim=3)
-        return image_raw_and_preprocessed
+        assert "raw" in named_inputs
+        assert "embedding" in named_inputs
+        return named_inputs["embedding"]
 
 
 bricks = {
-    'preprocessor': BrickNotTrainable(PreprocessorDummy(), input_names=['raw'],  output_names=['preprocessed']),
-    'backbone': BrickTrainable(TinyModel(n_channels=3, n_features=10), input_names=['preprocessed'], output_names=['embedding']),
-    'visualizer': BrickNotTrainable(VisualizeRawAndPreprocessed(), input_names = ['__all__'], output_names=["visualization"])
+    'backbone': BrickTrainable(TinyModel(n_channels=3, n_features=10), input_names=['raw'], output_names=['embedding']),
+    'post_processor': BrickNotTrainable(MyNewPostProcessor(), input_names = ['__all__'], output_names=["postprocessed"])
 }
 brick_collection = BrickCollection(bricks)
 named_outputs = brick_collection(named_inputs={'raw': torch.rand((2, 3, 100, 200))}, stage=Stage.INFERENCE)
@@ -674,17 +675,17 @@ assert list(named_outputs["processed"].shape[2:]) == [100, 200]
 We provide `BrickPerImageVisualization` as base brick for doing visualizations in a brick collection. 
 The advantage of brick-based visualization is that it can be bundled together with a specific task/head. 
 
-Visualization/drawing functions typically operate on a single image and on non-`torch.Tensor` data types.
+Secondly, visualization/drawing functions typically operate on a single image and on non-`torch.Tensor` data types.
 E.g. Opencv/matplotlib uses `np.array` and pillow using `Image`. 
 
 (Torchvision actually has functions to draw rectangles, key-points and segmentation masks directly on `torch.Tensor`s -
 but it still operates on a single image and it has no option for rendering text).
 
-The goal of `BrickPerImageVisualization` is to convert batched tensors/data to per image data in a desired format
+The goal of `BrickPerImageVisualization` is to convert batched tensors/data to per image data in a desired format/datatype 
 and pass it to a draw function. Look up the documentation of `BrickPerImageVisualization` to see all options.
 
-First we create a callable to do per image visualizations. It can be a simple function, but in this example we create a callable 
-class to pass in class names and initialize font. 
+First we create a callable to do per image visualizations. It can be a simple function, but as demonstrated in below example, it 
+can also be a callable class. 
 
 The callable visualizes image classification predictions using pillow and requires two `np.array`s as input: 
 `input_image` of shape [H, W, C] and `target_prediction` [1].
@@ -709,7 +710,7 @@ class VisualizeImageClassification:
         return image
 ```
 
-Our new drawing class `VisualizeImageClassification` is not passed to `BrickPerImageVisualization` and used in a brick collection.
+The drawing class `VisualizeImageClassification` is now passed to `BrickPerImageVisualization` and used in a brick collection.
 
 ```python
 
@@ -786,11 +787,12 @@ Specifying unpacking by input name (`unpack_functions_for_input_name`) will over
 ## Motivation
 
 The main motivation:
-- Sharable models: Packing model parts, metrics, loss-functions and visualization into a single recipe, makes the model more sharable to
-  other projects and supports sharing model for different use cases such as: Only inference, inference+visualizations and 
+- Sharable models: Packing model parts, metrics, loss-functions and visualizations into a single recipe, makes the model more sharable to
+  other projects and supports sharing models for different use cases such as: Only inference, inference+visualizations and 
   training+metrics+losses.
 - Shareable Parts: The brick collection encourage users to decouples parts and making also each part more sharable. 
-- Multiple tasks: Makes it easier to add and remove tasks. Each task can be expressed by model parts in a dictionary, we can easily add/remove them to a brick collection. 
+- Multiple tasks: Makes it easier to add and remove tasks. Each task can be expressed by model parts in a dictionary, 
+  we can easily add/remove them to a brick collection. 
 - By packing model modules, metrics, loss-functions and visualization into a single brick collection, we can more easily 
   inject it into your custom trainer and evaluation without doing per task/model modifications. 
 - Your model is **not** required to only return logits. Some training frameworks expect you to only return logits - values that go into 
@@ -798,23 +800,16 @@ The main motivation:
   calculate metrics, do visualizations and make prediction human interpretable. It encourage unclear control flow (if/else statements) 
   in the model that depends on model stage. 
 - Using input and output names makes it easier to describe how parts are connected. Internally data is passed between bricks in a 
-  dictionary of any type - making in flexible. But for each module, you can specific and check types hints for input and output data to 
-  both improve readability and more production ready. 
+  dictionary of any type - making in flexible. But for each module, you can specific and add and check type hints for input and output 
+  data to both improve readability and make it more production ready. 
 - When I started making a framework suited for multiple tasks, I would passed dictionaries around to all modules and pull out tensors by
-  name in modules. Changing names would break stuff and it was not production ready. I also started using the typical 
-  backbone(encoder) / head(decoder) separation... But some heads may share a common neck. The decoder might also take different inputs and
+  name in each module. Booking keeping names and updating names was messy. 
+  I also started using the typical backbone(encoder) / head(decoder) separation... But some heads may share a common neck. 
+  The decoder might also take different inputs and
   split into different representation and merge again... Also to avoid code duplication, I ended up during 
   multiple layers of inheritance for the decoder, making reuse bad and generally everything became too complicated and a new task would 
   require me to refactor the whole concept. Yes, it was probably not a super great attempt either, but it made me realize it should be 
   easier to make a new task and it should be easier to reuse parts. 
-
-
-
-
-## Why should I explicitly set the train, val or test stage
-
-MISSING
-
 
 
 <!-- #region -->
@@ -850,7 +845,7 @@ MISSING
 - [x] Relative input/output names
 - [x] Test to verify that environment matches conda lock. The make command 'update-lock-file' should store a copy of 'environment.yml'
       We will the have a test checking if the copy and the current version of `environment.yml` is the same.
-- [x] Add code coverage and tests passed badges to readme again
+- [x] Add code coverage and tests passed badges to readme
 - [x] Create brick-collection visualization tool ("mermaid?")
 - [x] Make DAG like functionality to check if inputs and outputs works for all model stages.
 - [x] Make Base Module PerImageProcessing as the basis for doing visualizations. 

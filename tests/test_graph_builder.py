@@ -34,6 +34,5 @@ def test_graph_builder():
     }
 
     brick_collection = BrickCollection(bricks)
-
     print(create_mermaid_dag_graph(brick_collection))
     print()

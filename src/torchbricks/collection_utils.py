@@ -38,7 +38,7 @@ def unflatten(d: Dict[str, Any], base: Optional[Dict[str, Any]] = None, sep: str
                 root = root[part]
 
         if isinstance(value, dict):
-            value = unflatten(value, root.get(key, {}))
+            value = unflatten(value, root.get(key, {}), sep=sep)
 
         root[key] = value
 

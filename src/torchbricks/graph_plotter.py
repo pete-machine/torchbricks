@@ -67,7 +67,7 @@ class MermaidDagBuilder:  # Pipeline pattern
     def define_node(self, brick: Node):
         module_name = brick.brick.get_module_name()
         style = brick.brick.get_brick_type()
-        brick_string = f'{brick.name}("<strong>{style}</strong><br><strong>{brick.name}</strong>: {module_name}"):::{style}'
+        brick_string = f"{brick.name}(<strong>'{brick.name}': {module_name}</strong><br><i>{style}</i>):::{style}"
         self.add_string(brick_string)
 
     def draw_nodes_and_connections(self, dag_nodes: Dict[str, Node]):
