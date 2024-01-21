@@ -1,6 +1,7 @@
+import pytest
 import torch
 import torchvision
-from torchbricks.bag_of_bricks import ImageClassifier, resnet_to_brick
+from torchbricks.bag_of_bricks import SUPPORTED_BACKBONES, ImageClassifier, create_backbone, resnet_to_brick
 from torchbricks.bricks import Stage
 
 
@@ -12,6 +13,16 @@ def test_convert_resnet_backbone_brick():
     output = resnet_backbone_brick(named_inputs={'image': torch.rand((1, 3, 50, 100))}, stage=Stage.TRAIN)
     assert hasattr(resnet_backbone_brick.model, 'n_backbone_features')
     assert resnet_backbone_brick.model.n_backbone_features == output['features'].shape[1]
+
+@pytest.mark.parametrize('backbone_name', SUPPORTED_BACKBONES)
+def test_create_backbone(backbone_name):
+    backbone = create_backbone(name=backbone_name, pretrained=True)
+
+    output = backbone(torch.rand((1, 3, 50, 100)))
+    assert hasattr(backbone, 'n_backbone_features')
+    assert backbone.n_backbone_features == output.shape[1]
+
+
 
 def test_image_classifier_average_pooling():
     batch_size = 2

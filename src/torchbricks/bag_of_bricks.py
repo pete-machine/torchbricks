@@ -1,10 +1,22 @@
 import torch
+import torchvision
 from torch import Tensor, nn
 from torchvision import transforms
 from torchvision.models import ResNet
 
 from torchbricks.bricks import BrickTrainable
 
+SUPPORTED_RESNET_BACKBONES = ['resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152', 'resnext50_32x4d', 'resnext101_32x8d',
+                              'resnext101_64x4d', 'wide_resnet50_2', 'wide_resnet101_2']
+SUPPORTED_BACKBONES = SUPPORTED_RESNET_BACKBONES
+def create_backbone(name: str, pretrained: bool) -> nn.Module:
+    """Creates a backbone from a name without classification head"""
+    weights = 'DEFAULT' if pretrained else None
+    if name not in SUPPORTED_BACKBONES:
+        raise ValueError(f'Backbone {name} not supported. Supported backbones are {SUPPORTED_BACKBONES}')
+
+    if name in SUPPORTED_RESNET_BACKBONES:
+        return BackboneResnet(resnet=torchvision.models.resnet.__dict__[name](weights=weights))
 
 def resnet_to_brick(resnet: ResNet, input_name: str, output_name: str):
     """Function to convert a torchvision resnet model and convert it to a torch model"""

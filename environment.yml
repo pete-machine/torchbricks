@@ -10,7 +10,7 @@ dependencies:
   - torchmetrics=0.11.4     # A torchbrick package requirement
   - onnx=1.14.0             # A torchbrick package requirement
   - typeguard=3.0.2         # A torchbrick package requirement
-  - pytorch::torchvision=0.15.2
+  - pytorch::torchvision=0.15.2  # A torchbrick package requirement
   - pytorch::pytorch-cuda=11.7
   - pytorch-lightning=2.0.2
   # - deepdiff=6.3.0
@@ -20,10 +20,12 @@ dependencies:
 
   # Linting stuff
   - pre-commit=3.3.2
-  - coverage=7.2.5
+  - beartype=0.14.1
+  #
   - pytest=7.3.1
   - pytest-cov=4.0.0
-  - beartype=0.14.1
+  - coverage=7.2.5
+  - lark=1.1.9
 
   # Build and release stuff
   - bumpver

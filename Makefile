@@ -16,20 +16,23 @@ show: ## Show the current environment.
 lint: ## Perform linting on all files using pre-commit
 	pre-commit run --all-files
 
-.PHONY: install
-install: ## create environment using lock-file
+.PHONY: env-install
+env-install: ## create environment using lock-file
 	micromamba create --name torchbricks --file conda-linux-64.lock
 
+.PHONY: env-install-min
+env-install-min: ## create environment using lock-file
+	micromamba create --name torchbricks_low --file environment-min.yml
 
-.PHONY: update-lock-file
-update-lock-file: ## Update lock file using the specification in 'environment.yml'
+.PHONY: env-create-lock-file
+env-create-lock-file: ## Update lock file using the specification in 'environment.yml'
 	@set -e
 	conda-lock -k explicit --conda micromamba -f environment.yml
 	cp environment.yml tests/data/copy_lock_filed_environment.yml
 
 
-.PHONY: update
-update: update-lock-file install ## Update lock file and environment using the specification in 'environment.yml'
+.PHONY: env-create-lock-and-install
+env-create-lock-and-install: env-create-lock-file env-install ## Update lock file and environment using the specification in 'environment.yml'
 
 .PHONY: test-all
 test-all: ## Run tests and generate coverage report.
