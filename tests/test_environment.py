@@ -20,5 +20,5 @@ def test_environment():
 
     is_env_updated = filecmp.cmp(path_current_env_file, path_env_file_locked)
     assert is_env_updated, ("The 'environment.yml'-file have been updated and you need to update the environement lock-file. \n"
-                            f"Run 'make update-lock-file' to ensure {path_current_env_file} matches our env lock"
+                            f"Run 'make env-create-lock-file' to ensure {path_current_env_file} matches our env lock"
                             "file 'conda-linux-64.lock'")
