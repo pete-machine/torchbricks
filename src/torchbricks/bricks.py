@@ -93,16 +93,16 @@ def parse_argument_alive_stages(alive_stages: Union[List[Stage], str]) -> List[S
 
 
 @typechecked
-def parse_argument_loss_output_names(loss_output_names: Union[List[str], str], available_output_names: List[str]) -> List[str]:
+def parse_argument_loss_output_name_indicies(loss_output_names: Union[List[str], str], available_output_names: List[str]) -> List[int]:
     if loss_output_names == 'all':
         loss_output_names = available_output_names
     elif loss_output_names == 'none':
         loss_output_names = []
 
     assert isinstance(loss_output_names, List), f'`loss_output_names` should be `all`, `none` or a list of strings. {loss_output_names=}'
-    assert set(loss_output_names).issubset(available_output_names), (f'One or more {loss_output_names=} is not an ',
+    assert set(loss_output_names).issubset(available_output_names), (f'One or more {loss_output_names=} is not an '
                                                                       '`output_names` of brick {output_names=}')
-    return loss_output_names
+    return [available_output_names.index(loss_output_name) for loss_output_name in loss_output_names]
 
 
 @typechecked
@@ -121,7 +121,7 @@ class BrickModule(nn.Module, BrickInterface):
                                 output_names=output_names,
                                 alive_stages=alive_stages)
         self.model = model
-        self.loss_output_names = parse_argument_loss_output_names(loss_output_names, available_output_names=output_names)
+        self.loss_output_indicies = parse_argument_loss_output_name_indicies(loss_output_names, available_output_names=output_names)
 
         if calculate_gradients:
             self.calculate_gradients_on = [Stage.TRAIN]
@@ -144,7 +144,8 @@ class BrickModule(nn.Module, BrickInterface):
         return named_outputs
 
     def extract_losses(self, named_outputs: Dict[str, Any]) -> Dict[str, Any]:
-        named_losses = {name: loss for name, loss in named_outputs.items() if name in self.loss_output_names}
+        loss_output_names = [self.output_names[index] for index in self.loss_output_indicies]
+        named_losses = {name: loss for name, loss in named_outputs.items() if name in loss_output_names}
         return named_losses
 
     def get_module_name(self) -> str:

@@ -7,7 +7,15 @@ import torch
 import torchmetrics
 from torch import nn
 from torchbricks import bricks, custom_metrics
-from torchbricks.bricks import BrickCollection, BrickLoss, BrickMetrics, BrickMetricSingle, BrickModule, Stage
+from torchbricks.bricks import (
+    BrickCollection,
+    BrickLoss,
+    BrickMetrics,
+    BrickMetricSingle,
+    BrickModule,
+    Stage,
+    parse_argument_loss_output_name_indicies,
+)
 from torchmetrics.classification import MulticlassAccuracy
 from utils_testing.utils_testing import assert_equal_dictionaries, create_brick_collection
 
@@ -295,6 +303,21 @@ def test_no_inputs_or_outputs():
 
     brick_collection = BrickCollection(bricks)
     brick_collection(named_inputs={'raw': torch.rand((2, 3, 100, 200))}, stage=Stage.INFERENCE)
+
+def test_parse_argument_loss_output_name_indicies():
+
+    available_output_names = ['abc', 'def', 'ghi']
+    with pytest.raises(AssertionError, match='One or more loss'):
+        parse_argument_loss_output_name_indicies(loss_output_names=['123'], available_output_names=available_output_names)
+
+    empty = parse_argument_loss_output_name_indicies(loss_output_names=[], available_output_names=available_output_names)
+    assert empty == []
+
+    empty = parse_argument_loss_output_name_indicies(loss_output_names='none', available_output_names=available_output_names)
+    assert empty == []
+
+    all = parse_argument_loss_output_name_indicies(loss_output_names='all', available_output_names=available_output_names)
+    assert all == [0, 1, 2]
 
 
 def test_input_names_all():

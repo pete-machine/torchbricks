@@ -41,6 +41,7 @@ class BackboneResnet(nn.Module):
         x = self.resnet.layer4(x)
         return x
 
+
 class ImageClassifier(nn.Module):
     """"""
     def __init__(self, num_classes: int, n_features: int, use_average_pooling: bool = True) -> None:
@@ -65,9 +66,13 @@ class Preprocessor(nn.Module):
         self,
         mean=(0.485, 0.456, 0.406),
         std=(0.229, 0.224, 0.225),
+        uint8_to_float32: bool = False,
     ):
         super().__init__()
         self.transforms = transforms.Normalize(mean=mean, std=std)
+        self.uint8_to_float32 = uint8_to_float32
 
     def __call__(self, img):
+        if self.uint8_to_float32:
+            img = img.float() / 255.0
         return self.transforms(img)
