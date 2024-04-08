@@ -15,11 +15,11 @@ def _flatten_dict_gen(d, parent_key, sep):
             yield new_key, v
 
 
-def flatten_dict(d: MutableMapping, parent_key: str = '', sep: str = '.'):
+def flatten_dict(d: MutableMapping, parent_key: str = "", sep: str = "."):
     return dict(_flatten_dict_gen(d, parent_key, sep))
 
 
-def unflatten(d: Dict[str, Any], base: Optional[Dict[str, Any]] = None, sep: str = '/') -> Dict[str, Any]:
+def unflatten(d: Dict[str, Any], base: Optional[Dict[str, Any]] = None, sep: str = "/") -> Dict[str, Any]:
     """
     Convert any keys containing dotted paths to nested dicts
     https://stackoverflow.com/a/55545369

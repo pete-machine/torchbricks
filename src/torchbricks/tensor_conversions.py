@@ -50,8 +50,8 @@ def unpack_batched_tensor_to_pillow_images(batched_tensor: torch.Tensor) -> List
     Examples:
     - [B, 3, H, W] to list of Images
     """
-    assert batched_tensor.ndim == 4, f'Expected 4 dimensions, got {batched_tensor.ndim}'
-    assert batched_tensor.shape[1] == 3, f'Expected 3 channels, got {batched_tensor.shape[1]}'
+    assert batched_tensor.ndim == 4, f"Expected 4 dimensions, got {batched_tensor.ndim}"
+    assert batched_tensor.shape[1] == 3, f"Expected 3 channels, got {batched_tensor.shape[1]}"
     np_array = batched_tensor_to_batched_np_array_channel_last(batched_tensor)
     return [Image.fromarray(float2uint8(np_array)) for np_array in np_array]
 

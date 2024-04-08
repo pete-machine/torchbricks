@@ -27,7 +27,7 @@ class Dag:
 
 
 def brick_collection_as_dag(brick_collections: BrickCollection) -> Dag:
-    brick_collections_flat = flatten_dict(brick_collections, sep = '/')
+    brick_collections_flat = flatten_dict(brick_collections, sep = "/")
     all_input_names = set()
     all_output_names = set()
     dag_nodes = {}

@@ -15,7 +15,7 @@ class LightningBrickCollection(LightningModule):
         super().__init__()
 
         if experiment_name is None:
-            experiment_name = datetime.now().strftime('%Y_%m_%d_T_%H_%M_%S')
+            experiment_name = datetime.now().strftime("%Y_%m_%d_T_%H_%M_%S")
         self.path_experiment = path_experiments / experiment_name
         self.path_experiment.mkdir(parents=True)
 
@@ -27,19 +27,22 @@ class LightningBrickCollection(LightningModule):
         def is_single_value(tensor):
             return isinstance(tensor, torch.Tensor) and tensor.ndim == 0
 
-        single_valued_metrics = {f'{stage.value}/{metric_name}': value for metric_name, value in metrics.items() if is_single_value(value)}
+        single_valued_metrics = {f"{stage.value}/{metric_name}": value for metric_name, value in metrics.items() if is_single_value(value)}
         self.log_dict(single_valued_metrics)
 
     def _step(self, stage: Stage, batch, batch_idx: int):
-        named_inputs = {'raw': batch[0], 'targets': batch[1], 'batch_idx': batch_idx}
+        named_inputs = {"raw": batch[0], "targets": batch[1], "batch_idx": batch_idx}
         named_outputs = self.bricks(stage=stage, named_inputs=named_inputs)
         losses = self.bricks.extract_losses(named_outputs=named_outputs)
         loss = 0
         for loss_name, loss_value in losses.items():
-            self.log(f'{stage.value}/{loss_name}', loss_value)
+            self.log(f"{stage.value}/{loss_name}", loss_value)
             loss = loss + loss_value
-        self.log(f'{stage.value}/total_loss', loss)
+        self.log(f"{stage.value}/total_loss", loss)
         return loss
+
+    def predict_step(self, batch, batch_idx: int):
+        return self._step(stage=Stage.INFERENCE, batch=batch, batch_idx=batch_idx)
 
     def training_step(self, batch, batch_idx: int):
         return self._step(stage=Stage.TRAIN, batch=batch, batch_idx=batch_idx)

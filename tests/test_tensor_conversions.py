@@ -11,7 +11,7 @@ from torchbricks.tensor_conversions import (
 )
 
 
-@pytest.mark.parametrize(['tensor_shape', 'tensor_shape_expected'],
+@pytest.mark.parametrize(["tensor_shape", "tensor_shape_expected"],
                          [((5,), (5,)),  # Same shape
                           ((5, 3), (5, 3)),  # Same shape
                           ((5, 3, 10), (5, 10, 3)),
@@ -22,7 +22,7 @@ def test_batched_tensor_to_channel_last(tensor_shape, tensor_shape_expected):
     result = batched_tensor_to_channel_last(tensor)
     assert result.shape == tensor_shape_expected
 
-@pytest.mark.parametrize(['tensor_shape', 'tensor_full_shape_expected'],
+@pytest.mark.parametrize(["tensor_shape", "tensor_full_shape_expected"],
                          [((5,), (5,)),  # Same shape
                           ((5, 3), (5, 3)),  # Same shape
                           ((5, 3, 10), (5, 10, 3)),
@@ -39,7 +39,7 @@ def test_unpack_batched_tensor_to_numpy_format(tensor_shape, tensor_full_shape_e
     assert result[0].shape == tensor_shape_expected
     assert isinstance(result[0], np.ndarray)
 
-@pytest.mark.parametrize(['tensor_shape', 'tensor_full_shape_expected'],
+@pytest.mark.parametrize(["tensor_shape", "tensor_full_shape_expected"],
                          [((5,), (5,)),  # Same shape
                           ((5, 3), (5, 3)),  # Same shape
                           ((5, 3, 10), (5, 3, 10)),
@@ -64,7 +64,7 @@ def test_unpack_batched_tensor_to_pillow_images():
     assert isinstance(result[0], Image.Image)
     assert (result[0].height, result[0].width) == tensor_full_shape_expected[1:3]
 
-@pytest.mark.parametrize('tensor_shape', [(5, 3, 10), (5, 4, 10, 20)])
+@pytest.mark.parametrize("tensor_shape", [(5, 3, 10), (5, 4, 10, 20)])
 def test_unpack_batched_tensor_to_pillow_images_fail(tensor_shape):
     tensor = torch.ones(tensor_shape)
 

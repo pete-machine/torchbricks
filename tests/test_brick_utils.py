@@ -12,7 +12,7 @@ def test_export_onnx_trace(tmp_path: Path):
     num_classes = 3
     brick_collection = create_brick_collection(num_classes=num_classes, num_backbone_featues=10)
     model = BrickCollection(brick_collection)
-    named_inputs = {'raw': torch.zeros((1, 3, 64, 64))}
+    named_inputs = {"raw": torch.zeros((1, 3, 64, 64))}
 
     stage = Stage.EXPORT
     named_outputs = model(named_inputs, stage=stage, return_inputs=False)
@@ -20,7 +20,7 @@ def test_export_onnx_trace(tmp_path: Path):
     expected_input = list(named_inputs)
     expected_outputs = list(named_outputs)
 
-    path_onnx = Path(tmp_path / 'model.onnx')
+    path_onnx = Path(tmp_path / "model.onnx")
 
     dynamic_batch_size_configs = [False, True]
     for dynamic_batch_size in dynamic_batch_size_configs:
@@ -44,7 +44,7 @@ def test_export_torch_jit_script(tmp_path: Path):
     num_classes = 3
     brick_collection = create_brick_collection(num_classes=num_classes, num_backbone_featues=10)
     model = BrickCollection(brick_collection)
-    named_inputs = {'raw': torch.zeros((1, 3, 64, 64))}
+    named_inputs = {"raw": torch.zeros((1, 3, 64, 64))}
 
     stage = Stage.EXPORT
     named_outputs = model(named_inputs, stage=stage, return_inputs=False)

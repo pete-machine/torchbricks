@@ -49,7 +49,7 @@ test:
 .PHONY: train-cifar10
 train-cifar10: ## Run CIFAR10 training
 	@set -e
-	$(PYTHONPATH) python scripts/train_lightning_cifar10.py --batch_size 256 --num_workers 10 --max_epochs 20 --accelerator gpu
+	$(PYTHONPATH) python scripts/train_lightning_cifar10.py --batch_size 256 --num_workers 10 --max_epochs 20 --accelerator cuda
 
 .PHONY: readme-update
 readme-update: ## Convert README.ipynb to README.md

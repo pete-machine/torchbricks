@@ -6,11 +6,11 @@ from typeguard import typechecked
 
 @typechecked
 class ConcatenatePredictionAndTarget(Metric):
-    full_state_update = False  # Maybe this should be False?!
+    full_state_update = False  # https://lightning.ai/docs/torchmetrics/stable/pages/implement.html#internal-implementation-details
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.add_state('predictions', default=[], dist_reduce_fx='cat')
-        self.add_state('targets', default=[], dist_reduce_fx='cat')
+        self.add_state("predictions", default=[], dist_reduce_fx="cat")
+        self.add_state("targets", default=[], dist_reduce_fx="cat")
 
     def update(self, preds: torch.Tensor, target: torch.Tensor):
         assert preds.shape[0] == target.shape[0]  # Potentially remove this assertion if it is in your way.

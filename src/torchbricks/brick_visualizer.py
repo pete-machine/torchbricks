@@ -10,14 +10,15 @@ from torchbricks.bricks_helper import name_callable_outputs
 from torchbricks.tensor_conversions import unpack_batched_array_to_arrays, unpack_batched_tensor_to_numpy_format
 
 UNPACK_NO_CONVERSION = {
-    torch.Tensor: list, # Unpack as list only [B, C, H, W] -> [C, H, W]
-    np.ndarray: unpack_batched_array_to_arrays, # Unpack as list only [B, H, W, C] -> [H, W, C]
+    torch.Tensor: list,  # Unpack as list only [B, C, H, W] -> [C, H, W]
+    np.ndarray: unpack_batched_array_to_arrays,  # Unpack as list only [B, H, W, C] -> [H, W, C]
 }
 
 UNPACK_TENSORS_TO_NDARRAYS = {
     torch.Tensor: unpack_batched_tensor_to_numpy_format,
     np.ndarray: unpack_batched_array_to_arrays,  # Unpack as list only
 }
+
 
 @typechecked
 class BrickPerImageVisualization(BrickModule):
@@ -28,14 +29,18 @@ class BrickPerImageVisualization(BrickModule):
     Brick to perform operations on a batched input to a list of unbatched inputs.
     Useful when during per image visualization and processing.
     """
-    style: Dict[str, str] = use_default_style({'fill' :'#5C677D'})
-    def __init__(self, callable: Callable,
-                 input_names: Union[List[str], Dict[str, str]],
-                 output_names: List[str],
-                 unpack_functions_for_type: Optional[Dict[type, Optional[Callable]]] = None,
-                 alive_stages: Union[List[Stage], str, None] = None,
-                 unpack_functions_for_input_name: Optional[Dict[str, Optional[Callable]]] = None,
-                 ):
+
+    style: Dict[str, str] = use_default_style({"fill": "#5C677D"})
+
+    def __init__(
+        self,
+        callable: Callable,
+        input_names: Union[List[str], Dict[str, str]],
+        output_names: List[str],
+        unpack_functions_for_type: Optional[Dict[type, Optional[Callable]]] = None,
+        alive_stages: Union[List[Stage], str, None] = None,
+        unpack_functions_for_input_name: Optional[Dict[str, Optional[Callable]]] = None,
+    ):
         """
         Parameters
         ----------
@@ -60,13 +65,15 @@ class BrickPerImageVisualization(BrickModule):
 
         """
         alive_stages = alive_stages or [Stage.INFERENCE]
-        super().__init__(model=self.unpack_data,
-                         input_names=input_names,
-                         output_names=output_names,
-                         loss_output_names=[],
-                         alive_stages=alive_stages,
-                         calculate_gradients=False,
-                         trainable=False)
+        super().__init__(
+            model=self.unpack_data,
+            input_names=input_names,
+            output_names=output_names,
+            loss_output_names=[],
+            alive_stages=alive_stages,
+            calculate_gradients=False,
+            trainable=False,
+        )
 
         self.type_unpack_functions = unpack_functions_for_type or UNPACK_TENSORS_TO_NDARRAYS
         self.callable = callable
@@ -74,8 +81,10 @@ class BrickPerImageVisualization(BrickModule):
         self.input_name_unpack_functions = unpack_functions_for_input_name or {}
         input_names_list = self.input_names_as_list()
         input_names_to_unpack = list(self.input_name_unpack_functions)
-        assert set(input_names_to_unpack).issubset(input_names_list), (f'One or more {input_names_to_unpack=} is not an ',
-                                                              f'`input_names` of brick {input_names_list=}')
+        assert set(input_names_to_unpack).issubset(input_names_list), (
+            f"One or more {input_names_to_unpack=} is not an ",
+            f"`input_names` of brick {input_names_list=}",
+        )
 
     def unpack_data(self, *args, **kwargs):
         uses_keyword_args = len(kwargs) > 0
@@ -87,7 +96,6 @@ class BrickPerImageVisualization(BrickModule):
         named_data_batched = dict(zip(self.input_names_as_list(), function_kwargs))
         named_data_unpacked_as_lists = {}
         for input_name, input_to_unpack in named_data_batched.items():
-
             unpack_function = self.type_unpack_functions.get(type(input_to_unpack), None)
             if input_name in self.input_name_unpack_functions:  # input_name unpack functions are prioritized above type unpack functions
                 unpack_function = self.input_name_unpack_functions[input_name]
@@ -99,11 +107,11 @@ class BrickPerImageVisualization(BrickModule):
         unpack_types = (list, tuple)
         batch_sizes = [len(unpacked) for unpacked in named_data_unpacked_as_lists.values() if isinstance(unpacked, unpack_types)]
         if len(batch_sizes) == 0:
-            raise ValueError(f'Can not estimate batch size from these inputs: {self.input_names_as_list()}')
+            raise ValueError(f"Can not estimate batch size from these inputs: {self.input_names_as_list()}")
 
         batch_size_counts = Counter(batch_sizes)
         if len(batch_size_counts) > 1:
-            raise ValueError(f'Batch size is not the same for all inputs: {self.input_names_as_list()}')
+            raise ValueError(f"Batch size is not the same for all inputs: {self.input_names_as_list()}")
 
         batch_size = batch_size_counts.most_common(1)[0][0]
         per_image_data = defaultdict(dict)

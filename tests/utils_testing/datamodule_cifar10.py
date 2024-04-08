@@ -22,7 +22,7 @@ class CIFAR10DataModule(LightningDataModule):
         self.label_names = [str(number) for number in range(self.num_classes)]
 
     def get_data_class_info(self):
-        return {'dims': self.dims, 'num_classes': self.num_classes, 'label_names': self.label_names}
+        return {"dims": self.dims, "num_classes": self.num_classes, "label_names": self.label_names}
 
     def prepare_data(self):
         # download
@@ -31,12 +31,12 @@ class CIFAR10DataModule(LightningDataModule):
 
     def setup(self, stage=None):
         # Assign train/val datasets for use in dataloaders
-        if stage == 'fit' or stage is None:
+        if stage == "fit" or stage is None:
             cifar_full = datasets.CIFAR10(self.data_dir, train=True, transform=self.train_transforms)
             self.cifar_train, self.cifar_val = random_split(cifar_full, [45000, 5000])
 
         # Assign test dataset for use in dataloader(s)
-        if stage == 'test' or stage is None:
+        if stage == "test" or stage is None:
             self.cifar_test = datasets.CIFAR10(self.data_dir, train=False, transform=self.test_transforms)
 
     def train_dataloader(self) -> DataLoader:

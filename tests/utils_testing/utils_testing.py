@@ -54,21 +54,21 @@ def create_brick_collection(num_classes: int, num_backbone_featues: int) -> Dict
 
 
     metric_collection = torchmetrics.MetricCollection({
-        'MeanAccuracy': MulticlassAccuracy(num_classes=num_classes, average='macro'),
-        'Accuracy': MulticlassAccuracy(num_classes=num_classes, average='micro'),
-        'ConfMat': torchmetrics.ConfusionMatrix(task='multiclass', num_classes=num_classes),
-        'Concatenate': custom_metrics.ConcatenatePredictionAndTarget(compute_on_cpu=True)
+        "MeanAccuracy": MulticlassAccuracy(num_classes=num_classes, average="macro"),
+        "Accuracy": MulticlassAccuracy(num_classes=num_classes, average="micro"),
+        "ConfMat": torchmetrics.ConfusionMatrix(task="multiclass", num_classes=num_classes),
+        "Concatenate": custom_metrics.ConcatenatePredictionAndTarget(compute_on_cpu=True)
     })
     classifier = Classifier(input_channels=num_backbone_featues, num_classes=num_classes)
 
     bricks = {
-        'preprocessor': BrickNotTrainable(Preprocessor(), input_names=['raw'], output_names=['preprocessed']),
-        'backbone': BrickTrainable(TinyBackbone(n_kernels=num_backbone_featues), input_names=['preprocessed'],
-                                                       output_names=['features']),
+        "preprocessor": BrickNotTrainable(Preprocessor(), input_names=["raw"], output_names=["preprocessed"]),
+        "backbone": BrickTrainable(TinyBackbone(n_kernels=num_backbone_featues), input_names=["preprocessed"],
+                                                       output_names=["features"]),
     }
-    bricks['head'] = {
-        'classifier': BrickTrainable(classifier, input_names=['features'], output_names=['predictions']),
-        'loss': BrickLoss(nn.CrossEntropyLoss(), input_names=['predictions', 'labels'], output_names=['ce_loss']),
-        'metrics': BrickMetrics(metric_collection, input_names=['predictions', 'labels'])
+    bricks["head"] = {
+        "classifier": BrickTrainable(classifier, input_names=["features"], output_names=["predictions"]),
+        "loss": BrickLoss(nn.CrossEntropyLoss(), input_names=["predictions", "labels"], output_names=["ce_loss"]),
+        "metrics": BrickMetrics(metric_collection, input_names=["predictions", "labels"])
     }
     return bricks

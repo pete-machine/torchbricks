@@ -716,8 +716,8 @@ The drawing class `VisualizeImageClassification` is now passed to `BrickPerImage
 
 from torchbricks.brick_visualizer import BrickPerImageVisualization
 bricks = {
-    'visualizer': BrickPerImageVisualization(callable=VisualizeImageClassification(class_names=["cat", "dog"]), 
-                                          input_names=["input_image", "target"], 
+    'visualizer': BrickPerImageVisualization(callable=VisualizeImageClassification(class_names=["cat", "dog"]),
+                                          input_names=["input_image", "target"],
                                           output_names=["visualization"],
                                           alive_stages=[Stage.INFERENCE])
 }
@@ -803,7 +803,7 @@ The main motivation:
   dictionary of any type - making in flexible. But for each module, you can specific and add and check type hints for input and output 
   data to both improve readability and make it more production ready. 
 - When I started making a framework suited for multiple tasks, I would passed dictionaries around to all modules and pull out tensors by
-  name in each module. Booking keeping names and updating names was messy. 
+  name in each module. Book keeping names and updating names was messy. 
   I also started using the typical backbone(encoder) / head(decoder) separation... But some heads may share a common neck. 
   The decoder might also take different inputs and
   split into different representation and merge again... Also to avoid code duplication, I ended up during 
@@ -816,52 +816,25 @@ The main motivation:
 ##
 
 ## What are we missing?
-
-
-- [x] ~~Proper~~ Added a link to `LightningBrickCollection` for other people to use
-- [x] Minor: BrickCollections supports passing a dictionary with BrickCollections. But we should also convert a nested dictionary into a nested brick collections
-- [x] Minor: Currently, `input_names` and `output_names` support positional arguments, but we should also support keyword arguments.
-- [x] Minor: Make Brick an abstract class
-- [x] Convert torchvision resnet models to only a backbone brick.
-- [x] Make readme a notebook
-- [x] Automatically convert jupyter notebook to `README.md`
-- [x] Remove README.md header
-- [x] Make an export to onnx function 
-- [x] Make it optional if gradients can be passed through NonTrainableBrick without weights being optimized
-- [x] Refactor Metrics: Create BrickMetricCollection and BrickSingleMetric and create flag to return metrics.
-- [x] Make brick base class with input_names, output_names and alive_stages - inherit this from other bricks. 
-  - Pros: We might include other non-torch modules later. 
-  - Do not necessarily pass a stage-object. Consider also passing it as a string so it can be handled correctly with scripting. 
-- [x] Update README.md to match the new bricks. 
-  - [x] Start with basic bricks example. 
-  - [x] Use loss-function to show that stage decided on what is being executed. 
-  - [x] Introduce metrics by it-self in another example
-- [x] Ensure that all examples in the `README.md` are working with easy to use modules. 
-- [x] Add typeguard
-- [x] Allow a brick to receive all named_inputs and add a test for it.
-- [x] Fix the release process. It should be as simple as running `make release`.
-- [x] Add onnx export example to the README.md
-- [x] Pretty print bricks
-- [x] Relative input/output names
-- [x] Test to verify that environment matches conda lock. The make command 'update-lock-file' should store a copy of 'environment.yml'
-      We will the have a test checking if the copy and the current version of `environment.yml` is the same.
-- [x] Add code coverage and tests passed badges to readme
-- [x] Create brick-collection visualization tool ("mermaid?")
-- [x] Make DAG like functionality to check if inputs and outputs works for all model stages.
-- [x] Make Base Module PerImageProcessing as the basis for doing visualizations. 
-  - [ ] Consider caching unpacked data
-- [ ] Demonstrate model configuration with hydra
+- [ ] Saving-loading brick collections
+  - The user is able to define a model in code and from config (From config require it as an argument in the init-function?)
+  - The user will easily load some parts of the model and train from scratch for other parts. "auto", "none", "strict"
+- [ ] Move parts generic parts from model-trainer to torch-bricks
+- [ ] Add stage as an internal state and not in the forward pass:
+  - Minor Pros: Tracing (to get onnx model) requires 'torch.Tensors' only as input - we avoid making an adapter class. 
+  - Minor Cons: State gets hidden away - implicit instead of explicit.
+  - Minor Pros: Similar to eval/training in pytorch
+  - Minor Pros: The forward call does not require the user to always pass the stage - less typing.
+- [ ] A user can pass in both stage as a str and as an enum. (It is always a string internally). String makes it easier to jit trace and we
+      a user can create self-defined stages. 
+- [ ] Demonstrate model configuration with hydra in this document
 - [ ] Make common Visualizations with pillow - not opencv to not blow up the required dependencies. ImageClassification, Segmentation, ObjectDetection
   - [ ] VideoModule to store data as a video
   - [ ] DisplayModule to show data
+- [ ] Consider caching unpacked data for `PerImageVisualizer`
 - [ ] Multiple named tensors caching module. 
 - [ ] Use pymy, pyright or pyre to do static code checks. 
-- [ ] Decide: Add stage as an internal state and not in the forward pass:
-  - Minor Pros: Tracing (to get onnx model) requires only torch.Tensors only as input - we avoid making an adapter class. 
-  - Minor Cons: State gets hidden away - implicit instead of explicit.
-  - Minor Pros: Similar to eval/training 
 - [ ] Collection of helper modules. Preprocessors, Backbones, Necks/Upsamplers, ImageClassification, SemanticSegmentation, ObjectDetection
-  - [x] All the modules in the README should be easy to import as actually modules.
   - [ ] Make common brick collections: BricksImageClassification, BricksSegmentation, BricksPointDetection, BricksObjectDetection
 - [ ] Support preparing data in the dataloader?
 - [ ] Support torch.jit.scripting? 

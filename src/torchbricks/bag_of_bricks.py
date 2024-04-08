@@ -6,21 +6,39 @@ from torchvision.models import ResNet
 
 from torchbricks.bricks import BrickTrainable
 
-SUPPORTED_RESNET_BACKBONES = ['resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152', 'resnext50_32x4d', 'resnext101_32x8d',
-                              'resnext101_64x4d', 'wide_resnet50_2', 'wide_resnet101_2']
+SUPPORTED_RESNET_BACKBONES = [
+    "resnet18",
+    "resnet34",
+    "resnet50",
+    "resnet101",
+    "resnet152",
+    "resnext50_32x4d",
+    "resnext101_32x8d",
+    "resnext101_64x4d",
+    "wide_resnet50_2",
+    "wide_resnet101_2",
+]
 SUPPORTED_BACKBONES = SUPPORTED_RESNET_BACKBONES
-def create_backbone(name: str, pretrained: bool) -> nn.Module:
+
+
+def create_backbone(name: str, pretrained: bool, small: bool = False) -> nn.Module:
     """Creates a backbone from a name without classification head"""
-    weights = 'DEFAULT' if pretrained else None
+    weights = "DEFAULT" if pretrained else None
     if name not in SUPPORTED_BACKBONES:
-        raise ValueError(f'Backbone {name} not supported. Supported backbones are {SUPPORTED_BACKBONES}')
+        raise ValueError(f"Backbone {name} not supported. Supported backbones are {SUPPORTED_BACKBONES}")
 
     if name in SUPPORTED_RESNET_BACKBONES:
-        return BackboneResnet(resnet=torchvision.models.resnet.__dict__[name](weights=weights))
+        model = torchvision.models.resnet.__dict__[name](weights=weights)
+        if small:
+            model.conv1 = nn.Conv2d(3, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+            model.maxpool = nn.Identity()
+        return BackboneResnet(resnet=model)
+
 
 def resnet_to_brick(resnet: ResNet, input_name: str, output_name: str):
     """Function to convert a torchvision resnet model and convert it to a torch model"""
     return BrickTrainable(model=BackboneResnet(resnet), input_names=[input_name], output_names=[output_name])
+
 
 class BackboneResnet(nn.Module):
     def __init__(self, resnet: ResNet) -> None:
@@ -44,6 +62,7 @@ class BackboneResnet(nn.Module):
 
 class ImageClassifier(nn.Module):
     """"""
+
     def __init__(self, num_classes: int, n_features: int, use_average_pooling: bool = True) -> None:
         super().__init__()
         self.fc = nn.Linear(n_features, num_classes)

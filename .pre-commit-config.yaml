@@ -12,7 +12,6 @@ repos:
     -   id: check-added-large-files
     -   id: check-merge-conflict
     -   id: check-ast
-    -   id: double-quote-string-fixer
     -   id: debug-statements
     -   id: check-toml
     -   id: check-json

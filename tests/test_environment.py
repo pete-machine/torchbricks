@@ -15,8 +15,8 @@ def test_environment():
     If `[repo]/environement.yml` and `[repo]/tests/data/copy_lock_filed_environment.yml` are not equal we expected the lock file to be
     outdated.
     """
-    path_current_env_file = path_repo_root() / 'environment.yml'
-    path_env_file_locked = path_repo_root() / 'tests' / 'data' / 'copy_lock_filed_environment.yml'
+    path_current_env_file = path_repo_root() / "environment.yml"
+    path_env_file_locked = path_repo_root() / "tests" / "data" / "copy_lock_filed_environment.yml"
 
     is_env_updated = filecmp.cmp(path_current_env_file, path_env_file_locked)
     assert is_env_updated, ("The 'environment.yml'-file have been updated and you need to update the environement lock-file. \n"
