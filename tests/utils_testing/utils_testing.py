@@ -4,7 +4,6 @@ from typing import Dict
 
 import torch
 import torchmetrics
-from beartype import beartype
 from torch import nn
 from torchbricks import custom_metrics
 from torchbricks.bricks import BrickInterface, BrickLoss, BrickMetrics, BrickNotTrainable, BrickTrainable
@@ -15,7 +14,6 @@ def path_repo_root():
     return Path(__file__).parents[2]
 
 
-@beartype
 def assert_equal_dictionaries(d0: Dict, d1: Dict, is_close: bool = False):
     assert set(d0) == set(d1)
     for key, values in d0.items():
