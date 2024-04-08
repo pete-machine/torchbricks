@@ -1,8 +1,21 @@
 {
     "autoDocstring.docstringFormat": "numpy",
     "cSpell.words": [
+        "Christiansen",
+        "cuda",
+        "deepdiff",
+        "ipynb",
         "jupytext",
-        "torchvision"
+        "nbconvert",
+        "nbmake",
+        "onnx",
+        "pytest",
+        "torchbrick",
+        "torchbricks",
+        "torchmetrics",
+        "torchvision",
+        "typeguard",
+        "wandb"
     ],
     "editor.rulers": [
         140

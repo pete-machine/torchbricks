@@ -46,9 +46,12 @@ A preprocessor, a backbone and a head (in this case a classifier).
 *Note: Don't worry about the actually implementation of these modules - they are just dummy examples.*
 
 ```python
-from typing import Tuple, Any
+from typing import Any, Tuple
+
 import torch
 from torch import nn
+
+
 class PreprocessorDummy(nn.Module):
     def forward(self, raw_input: torch.Tensor) -> torch.Tensor:
         return raw_input/2
@@ -81,8 +84,7 @@ each module similar to a DAG.
 In below code snippet, we demonstrate how this would look for our dummy model. 
 
 ```python
-from torchbricks.bricks import BrickCollection, BrickTrainable, BrickNotTrainable, BrickLoss
-from torchbricks.bricks import Stage
+from torchbricks.bricks import BrickCollection, BrickLoss, BrickNotTrainable, BrickTrainable, Stage
 from torchbricks.graph_plotter import create_mermaid_dag_graph
 
 bricks = {

@@ -1,4 +1,5 @@
 [tool.ruff]
+extend-include = ["*.ipynb"]
 line-length = 140
 select = ["C4", "E", "F","B", "I", "W", "RUF", "Q"]
 
