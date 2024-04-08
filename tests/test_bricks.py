@@ -29,7 +29,6 @@ def test_brick_collection():
 
     model = bricks.BrickCollection(bricks=brick_collection)
 
-
     named_inputs = {"labels": torch.tensor(range(num_classes), dtype=torch.float64), "raw": torch.zeros((3, 24, 24))}
 
     named_outputs = model(stage=Stage.TRAIN, named_inputs=named_inputs)
@@ -76,7 +75,7 @@ def test_brick_collection_no_metrics_no_losses():
     model = bricks.BrickCollection(bricks=brick_collection)
 
     named_inputs = {"labels": torch.tensor(range(num_classes), dtype=torch.float64), "raw": torch.zeros((3, 24, 24))}
-    named_outputs = model(stage= Stage.INFERENCE, named_inputs=named_inputs)
+    named_outputs = model(stage=Stage.INFERENCE, named_inputs=named_inputs)
     assert expected_forward_named_outputs == set(named_outputs)
 
     model(stage=Stage.TRAIN, named_inputs=named_inputs)
@@ -88,11 +87,11 @@ def test_brick_collection_no_metrics_no_losses():
     assert expected_forward_named_outputs.union(expected_named_losses) == set(named_outputs)
     assert expected_named_losses == losses
 
-def test_nested_bricks():
 
+def test_nested_bricks():
     class PreprocessorHalf(nn.Module):
         def forward(self, raw_input: torch.Tensor) -> torch.Tensor:
-            return raw_input/2
+            return raw_input / 2
 
     class PreprocessorSquareRoot(nn.Module):
         def forward(self, raw_input: torch.Tensor) -> torch.Tensor:
@@ -101,8 +100,8 @@ def test_nested_bricks():
     def root_bricks():
         return {
             "preprocessor0": bricks.BrickNotTrainable(PreprocessorHalf(), input_names=["in0"], output_names=["out1"]),
-            "preprocessor1": bricks.BrickNotTrainable(PreprocessorHalf(), input_names=["out1"], output_names=["out2"])
-            }
+            "preprocessor1": bricks.BrickNotTrainable(PreprocessorHalf(), input_names=["out1"], output_names=["out2"]),
+        }
 
     def nested_bricks():
         return {
@@ -125,7 +124,6 @@ def test_nested_bricks():
     flat_brick_dict.update(nested_bricks())
     brick_collection_flat = bricks.BrickCollection(bricks=nested_brick_dict)
 
-
     named_inputs = {"in0": torch.tensor(range(10), dtype=torch.float64)}
     outputs0 = brick_collection(named_inputs=named_inputs, stage=Stage.TRAIN)
     outputs1 = brick_collection_dict(named_inputs=named_inputs, stage=Stage.TRAIN)
@@ -134,13 +132,12 @@ def test_nested_bricks():
     assert_equal_dictionaries(outputs1, outputs2)
 
     expected_outputs = dict(named_inputs)
-    expected_outputs["out1"] = expected_outputs["in0"]/2
-    expected_outputs["out2"] = expected_outputs["out1"]/2
+    expected_outputs["out1"] = expected_outputs["in0"] / 2
+    expected_outputs["out2"] = expected_outputs["out1"] / 2
     expected_outputs["out3"] = torch.sqrt(expected_outputs["out2"])
     expected_outputs["out4"] = torch.sqrt(expected_outputs["out3"])
     outputs0.pop("stage")
     assert_equal_dictionaries(outputs0, expected_outputs)
-
 
     outputs0 = brick_collection(named_inputs=named_inputs, stage=Stage.TRAIN)
     outputs1 = brick_collection_dict(named_inputs=named_inputs, stage=Stage.TRAIN)
@@ -154,9 +151,10 @@ def test_nested_bricks():
 def test_brick_torch_metric_single_metric(metric_name: Optional[str]):
     num_classes = 5
     bricks = {
-        "accuracy": BrickMetricSingle(MulticlassAccuracy(num_classes=num_classes), input_names=["logits", "targets"],
-                                      metric_name=metric_name),
-        "loss": BrickLoss(model=nn.CrossEntropyLoss(), input_names=["logits", "targets"], output_names=["loss_ce"])
+        "accuracy": BrickMetricSingle(
+            MulticlassAccuracy(num_classes=num_classes), input_names=["logits", "targets"], metric_name=metric_name
+        ),
+        "loss": BrickLoss(model=nn.CrossEntropyLoss(), input_names=["logits", "targets"], output_names=["loss_ce"]),
     }
 
     model = BrickCollection(bricks)
@@ -171,20 +169,21 @@ def test_brick_torch_metric_single_metric(metric_name: Optional[str]):
     assert list(metrics) == [expected_metric_name]
 
 
-
 @pytest.mark.parametrize("return_metrics", [False, True])
 def test_brick_torch_metric_multiple_metric(return_metrics: bool):
     num_classes = 5
-    metric_collection = torchmetrics.MetricCollection({
-        "MeanAccuracy": MulticlassAccuracy(num_classes=num_classes, average="macro"),
-        "Accuracy": MulticlassAccuracy(num_classes=num_classes, average="micro"),
-        "ConfMat": torchmetrics.ConfusionMatrix(task="multiclass", num_classes=num_classes),
-        "Concatenate": custom_metrics.ConcatenatePredictionAndTarget(compute_on_cpu=True)
-    })
+    metric_collection = torchmetrics.MetricCollection(
+        {
+            "MeanAccuracy": MulticlassAccuracy(num_classes=num_classes, average="macro"),
+            "Accuracy": MulticlassAccuracy(num_classes=num_classes, average="micro"),
+            "ConfMat": torchmetrics.ConfusionMatrix(task="multiclass", num_classes=num_classes),
+            "Concatenate": custom_metrics.ConcatenatePredictionAndTarget(compute_on_cpu=True),
+        }
+    )
 
     bricks = {
         "metrics": BrickMetrics(metric_collection, input_names=["logits", "targets"], return_metrics=return_metrics),
-        "loss": BrickLoss(model=nn.CrossEntropyLoss(), input_names=["logits", "targets"], output_names=["loss_ce"])
+        "loss": BrickLoss(model=nn.CrossEntropyLoss(), input_names=["logits", "targets"], output_names=["loss_ce"]),
     }
 
     model = BrickCollection(bricks)
@@ -217,7 +216,7 @@ def test_brick_collection_print():
             (loss): BrickLoss(CrossEntropyLoss, input_names=['predictions', 'labels'], output_names=['ce_loss'], alive_stages=['TRAIN', 'TEST', 'VALIDATION'])
             (metrics): BrickMetrics(['Accuracy', 'Concatenate', 'ConfMat', 'MeanAccuracy'], input_names=['predictions', 'labels'], output_names=[], alive_stages=['TRAIN', 'TEST', 'VALIDATION'])
           )
-        )""") # noqa: E501
+        )""")  # noqa: E501
     assert brick_collection.__str__() == expected_str
 
 
@@ -232,14 +231,15 @@ def test_resolve_relative_names():
         "head1": {
             "classifier": BrickModule(model=nn.Identity(), input_names=["embeddings"], output_names=["./predictions"]),
             "loss": BrickModule(model=nn.Identity(), input_names=["./predictions"], output_names=["./loss"]),
-            "head1_nested":{
-                "classifier": BrickModule(model=nn.Identity(), input_names=["../../embeddings",
-                                                                            "../predictions",
-                                                                            "../../head0/predictions"],
-                                          output_names=["./predictions"]),
+            "head1_nested": {
+                "classifier": BrickModule(
+                    model=nn.Identity(),
+                    input_names=["../../embeddings", "../predictions", "../../head0/predictions"],
+                    output_names=["./predictions"],
+                ),
                 "loss": BrickModule(model=nn.Identity(), input_names=["./predictions"], output_names=["./loss"]),
-            }
-        }
+            },
+        },
     }
 
     model = BrickCollection(brick_collection_as_dict)
@@ -254,6 +254,7 @@ def test_resolve_relative_names():
     assert model["head1"]["head1_nested"]["loss"].input_names == ["head1/head1_nested/predictions"]
     assert model["head1"]["head1_nested"]["loss"].output_names == ["head1/head1_nested/loss"]
 
+
 def test_resolve_relative_names_dict():
     class SomeDummyLoss(nn.Module):
         def forward(self, tensor: torch.Tensor, named_data: Dict[str, Any]) -> torch.Tensor:
@@ -265,8 +266,9 @@ def test_resolve_relative_names_dict():
         "backbone": BrickModule(model=nn.Identity(), input_names=["processed"], output_names=["embeddings"]),
         "head0": {
             "classifier": BrickModule(model=nn.Identity(), input_names=["../embeddings"], output_names=["./predictions"]),
-            "loss": BrickModule(model=SomeDummyLoss(), input_names={"tensor": "./predictions", "named_data": "__all__"},
-                                     output_names=["./loss"]),
+            "loss": BrickModule(
+                model=SomeDummyLoss(), input_names={"tensor": "./predictions", "named_data": "__all__"}, output_names=["./loss"]
+            ),
         },
     }
 
@@ -291,8 +293,8 @@ def test_resolve_relative_names_errors():
     with pytest.raises(ValueError, match="Failed to resolve input name. Unable to resolve"):
         BrickCollection(bricks)
 
-def test_no_inputs_or_outputs():
 
+def test_no_inputs_or_outputs():
     class NoInputsNoOutputs(torch.nn.Module):
         def forward(self) -> None:
             return None
@@ -304,8 +306,8 @@ def test_no_inputs_or_outputs():
     brick_collection = BrickCollection(bricks)
     brick_collection(named_inputs={"raw": torch.rand((2, 3, 100, 200))}, stage=Stage.INFERENCE)
 
-def test_parse_argument_loss_output_name_indicies():
 
+def test_parse_argument_loss_output_name_indicies():
     available_output_names = ["abc", "def", "ghi"]
     with pytest.raises(AssertionError, match="One or more loss"):
         parse_argument_loss_output_name_indicies(loss_output_names=["123"], available_output_names=available_output_names)
@@ -341,9 +343,8 @@ def test_using_stage_inside_module():
             return name + "_not_in_validation"
 
     brick_collection = BrickCollection(
-        {
-            "blah": bricks.BrickNotTrainable(StageDependentOutput(), input_names=["name", "stage"], output_names=["output"])
-        })
+        {"blah": bricks.BrickNotTrainable(StageDependentOutput(), input_names=["name", "stage"], output_names=["output"])}
+    )
     named_outputs = brick_collection(named_inputs={"name": "blah"}, stage=Stage.INFERENCE)
     assert named_outputs["output"] == "blah_not_in_validation"
 
@@ -362,6 +363,7 @@ def test_save_and_load_of_brick_collection(tmp_path: Path):
     # Trainable parameters are loaded
     model.load_state_dict(torch.load(path_model))
 
+
 def iterate_stages():
     num_classes = 3
     brick_collection = create_brick_collection(num_classes=num_classes, num_backbone_featues=10)
@@ -373,9 +375,13 @@ def iterate_stages():
         model.on_step(named_inputs=named_inputs, stage=stage, batch_idx=0)
         model.summarize(stage, reset=True)
 
+
 @pytest.mark.slow
 @pytest.mark.parametrize("stage", [Stage.TRAIN, Stage.INFERENCE])
 def test_compile(stage: Stage):
+    import torch._dynamo
+
+    torch._dynamo.config.suppress_errors = True  # TODO: Remove this line later when possible
     num_classes = 3
     brick_collection = create_brick_collection(num_classes=num_classes, num_backbone_featues=10)
     model = BrickCollection(brick_collection)
