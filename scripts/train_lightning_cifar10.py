@@ -10,9 +10,11 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.loggers import WandbLogger
 from torch import nn
 from torch.optim.lr_scheduler import OneCycleLR
-from torchbricks.bag_of_bricks import ImageClassifier, Preprocessor, resnet_to_brick
+from torchbricks.bag_of_bricks.backbones import resnet_to_brick
+from torchbricks.bag_of_bricks.custom_metrics import ConcatenatePredictionAndTarget
+from torchbricks.bag_of_bricks.image_classification import ImageClassifier
+from torchbricks.bag_of_bricks.preprocessors import Preprocessor
 from torchbricks.bricks import BrickCollection, BrickInterface, BrickLoss, BrickMetrics, BrickNotTrainable, BrickTrainable
-from torchbricks.custom_metrics import ConcatenatePredictionAndTarget
 from torchmetrics import classification
 from utils_testing.datamodule_cifar10 import CIFAR10DataModule
 from utils_testing.lightning_module import LightningBrickCollection

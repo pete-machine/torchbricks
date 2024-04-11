@@ -8,7 +8,8 @@ import pytest
 import torch
 import torchmetrics
 from torch import nn
-from torchbricks import bricks, custom_metrics
+from torchbricks import bricks
+from torchbricks.bag_of_bricks import custom_metrics
 from torchbricks.bricks import (
     BrickCollection,
     BrickLoss,

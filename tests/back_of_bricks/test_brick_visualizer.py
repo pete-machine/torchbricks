@@ -3,9 +3,9 @@ from typing import Any, Dict, Tuple
 import numpy as np
 import pytest
 import torch
-import torchbricks.brick_visualizer
+import torchbricks.bag_of_bricks.brick_visualizer
 from PIL import Image, ImageDraw, ImageFont
-from torchbricks.brick_visualizer import BrickPerImageVisualization
+from torchbricks.bag_of_bricks.brick_visualizer import BrickPerImageVisualization
 from torchbricks.bricks import Stage
 from torchbricks.tensor_conversions import unpack_batched_tensor_to_pillow_images
 from typeguard import typechecked
@@ -49,7 +49,7 @@ def test_brick_per_image_processing_single_output_name(input_names):
         return array
 
     brick = BrickPerImageVisualization(callable=draw_function, input_names=input_names, output_names=["visualized"],
-                            unpack_functions_for_type=torchbricks.brick_visualizer.UNPACK_TENSORS_TO_NDARRAYS)
+                            unpack_functions_for_type=torchbricks.bag_of_bricks.brick_visualizer.UNPACK_TENSORS_TO_NDARRAYS)
 
     outputs = brick(named_inputs=named_inputs, stage=Stage.INFERENCE)
     assert len(outputs["visualized"]) == batch_size
@@ -94,7 +94,7 @@ def test_brick_per_image_processing_two_output_names_skip_unpack_functions_for(i
 
     model = BrickPerImageVisualization(callable=draw_function, input_names=input_names,
                                      output_names=["visualized0", "visualized1"],
-                                     unpack_functions_for_type=torchbricks.brick_visualizer.UNPACK_TENSORS_TO_NDARRAYS,
+                                     unpack_functions_for_type=torchbricks.bag_of_bricks.brick_visualizer.UNPACK_TENSORS_TO_NDARRAYS,
                                      unpack_functions_for_input_name={"processed": None})
     outputs = model(named_inputs=named_inputs, stage=Stage.INFERENCE)
     assert len(outputs["visualized0"]) == batch_size
@@ -123,7 +123,7 @@ def test_brick_per_image_processing_two_output_names_no_torch_to_numpy_unpacking
 
     model = BrickPerImageVisualization(callable=draw_function, input_names=input_names,
                                      output_names=["visualized0", "visualized1"],
-                                     unpack_functions_for_type=torchbricks.brick_visualizer.UNPACK_NO_CONVERSION,
+                                     unpack_functions_for_type=torchbricks.bag_of_bricks.brick_visualizer.UNPACK_NO_CONVERSION,
                                      unpack_functions_for_input_name={"processed": None})
     outputs = model(named_inputs=named_inputs, stage=Stage.INFERENCE)
     assert len(outputs["visualized0"]) == batch_size

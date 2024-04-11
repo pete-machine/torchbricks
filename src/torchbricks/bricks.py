@@ -17,11 +17,11 @@ log = logging.getLogger(__name__)
 
 
 class Stage(Enum):
-    TRAIN = "train"
-    VALIDATION = "validation"
-    TEST = "test"
-    INFERENCE = "inference"
-    EXPORT = "export"
+    TRAIN = "TRAIN"
+    VALIDATION = "VALIDATION"
+    TEST = "TEST"
+    INFERENCE = "INFERENCE"
+    EXPORT = "EXPORT"
 
 
 def use_default_style(overwrites: Optional[Dict[str, str]] = None):

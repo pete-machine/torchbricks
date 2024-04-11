@@ -3,11 +3,10 @@ from typing import Callable, Dict, List, Optional, Union
 
 import numpy as np
 import torch
-from typeguard import typechecked
-
 from torchbricks.bricks import BrickModule, Stage, use_default_style
 from torchbricks.bricks_helper import name_callable_outputs
 from torchbricks.tensor_conversions import unpack_batched_array_to_arrays, unpack_batched_tensor_to_numpy_format
+from typeguard import typechecked
 
 UNPACK_NO_CONVERSION = {
     torch.Tensor: list,  # Unpack as list only [B, C, H, W] -> [C, H, W]

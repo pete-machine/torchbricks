@@ -339,7 +339,9 @@ The used of TorchMetrics in a brick collection is demonstrated in below code sni
 
 ```python
 import torchvision
-from torchbricks.bag_of_bricks import ImageClassifier, Preprocessor, resnet_to_brick
+from torchbricks.bag_of_bricks.backbones import resnet_to_brick
+from torchbricks.bag_of_bricks.image_classification import ImageClassifier
+from torchbricks.bag_of_bricks.preprocessors import Preprocessor
 from torchbricks.bricks import BrickMetricSingle
 from torchmetrics.classification import MulticlassAccuracy
 
@@ -548,6 +550,31 @@ flowchart LR
 ```
 
 
+### Brick features: Save and loading bricks
+A brick collection can be saved and loaded as a regular pytorch `nn.Module`. For more information you can look up the official 
+pytorch guide on [Saving and Loading Models](https://pytorch.org/tutorials/beginner/saving_loading_models.html). 
+
+However, we have also added a brick collection specific saving/loading format. It uses a pytorch weight format, 
+but creates a model file for each brick and keeps files in a nested folder structure. 
+
+The idea is that a user can more easily add or remove weights to a specific model by simply moving around model files and folders.
+Time will tell, if this a useful abstraction or dead code. 
+
+But it looks like this: 
+
+```python
+path_model_folder = Path("build/bricks")
+
+# Saving model parameters brick-collection style
+brick_collections.save_bricks(path_model_folder=path_model_folder, exist_ok=True)
+
+print("Model files: ")
+print("\n".join(str(path) for path in path_model_folder.rglob("*.pt")))
+
+# Loading model parameters brick-collection style
+brick_collection.load_bricks(path_model_folder=path_model_folder)
+```
+
 ### Brick features: Export as ONNX
 To export a brick collection as onnx we provide the `export_bricks_as_onnx`-function. 
 
@@ -716,7 +743,7 @@ The drawing class `VisualizeImageClassification` is now passed to `BrickPerImage
 
 ```python
 
-from torchbricks.brick_visualizer import BrickPerImageVisualization
+from torchbricks.bag_of_bricks.brick_visualizer import BrickPerImageVisualization
 bricks = {
     'visualizer': BrickPerImageVisualization(callable=VisualizeImageClassification(class_names=["cat", "dog"]),
                                           input_names=["input_image", "target"],
@@ -822,19 +849,18 @@ The main motivation:
   - The user is able to define a model in code and from config (From config require it as an argument in the init-function?)
   - I have decided to only provide a "path_weights" in each brick collection. Each brick collection will load weights if the weights exists in a given folder. wrong path -> error, missing path -> warning of module (warning), warning in case a file is not used? 
   - Currently, this option supports training sub-node from scratch by removing the weight file from the folder.
-  -  [ ] Create an example in README
+  -  [x] Create an example in README
   -  [x] Check that warnings are raised when file or model is missing. 
-- [ ] Move parts generic parts from model-trainer to torch-bricks
+- [x] Move parts generic parts from model-trainer to torch-bricks
 - [ ] A user can pass in both stage as a str and as an enum. (It is always a string internally). String makes it easier to jit trace and we
       a user can create self-defined stages. 
-- [ ] Demonstrate model configuration with hydra in this document
 - [ ] Add stage as an internal state and not in the forward pass:
   - Minor Pros: Tracing (to get onnx model) requires 'torch.Tensors' only as input - we avoid making an adapter class. 
   - Minor Cons: State gets hidden away - implicit instead of explicit.
   - Minor Pros: Similar to eval/training in pytorch
   - Minor Pros: The forward call does not require the user to always pass the stage - less typing.
 Update version!
-
+- [ ] Demonstrate model configuration with hydra in this document
 - [ ] Make common Visualizations with pillow - not opencv to not blow up the required dependencies. ImageClassification, Segmentation, ObjectDetection
   - [ ] VideoModule to store data as a video
   - [ ] DisplayModule to show data

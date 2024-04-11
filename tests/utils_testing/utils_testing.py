@@ -4,7 +4,7 @@ from typing import Dict
 import torch
 import torchmetrics
 from torch import nn
-from torchbricks import custom_metrics
+from torchbricks.bag_of_bricks import custom_metrics
 from torchbricks.bricks import BrickInterface, BrickLoss, BrickMetrics, BrickNotTrainable, BrickTrainable
 from torchmetrics.classification import MulticlassAccuracy
 
