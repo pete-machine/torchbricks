@@ -818,18 +818,22 @@ The main motivation:
 ##
 
 ## What are we missing?
-- [ ] Saving-loading brick collections
+- [x] Saving-loading brick collections
   - The user is able to define a model in code and from config (From config require it as an argument in the init-function?)
-  - The user will easily load some parts of the model and train from scratch for other parts. "auto", "none", "strict"
+  - I have decided to only provide a "path_weights" in each brick collection. Each brick collection will load weights if the weights exists in a given folder. wrong path -> error, missing path -> warning of module (warning), warning in case a file is not used? 
+  - Currently, this option supports training sub-node from scratch by removing the weight file from the folder.
+  -  [ ] Create an example in README
 - [ ] Move parts generic parts from model-trainer to torch-bricks
+- [ ] A user can pass in both stage as a str and as an enum. (It is always a string internally). String makes it easier to jit trace and we
+      a user can create self-defined stages. 
+- [ ] Demonstrate model configuration with hydra in this document
 - [ ] Add stage as an internal state and not in the forward pass:
   - Minor Pros: Tracing (to get onnx model) requires 'torch.Tensors' only as input - we avoid making an adapter class. 
   - Minor Cons: State gets hidden away - implicit instead of explicit.
   - Minor Pros: Similar to eval/training in pytorch
   - Minor Pros: The forward call does not require the user to always pass the stage - less typing.
-- [ ] A user can pass in both stage as a str and as an enum. (It is always a string internally). String makes it easier to jit trace and we
-      a user can create self-defined stages. 
-- [ ] Demonstrate model configuration with hydra in this document
+Update version!
+
 - [ ] Make common Visualizations with pillow - not opencv to not blow up the required dependencies. ImageClassification, Segmentation, ObjectDetection
   - [ ] VideoModule to store data as a video
   - [ ] DisplayModule to show data

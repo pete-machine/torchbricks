@@ -1,3 +1,4 @@
+import copy
 import textwrap
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -17,12 +18,12 @@ from torchbricks.bricks import (
     parse_argument_loss_output_name_indicies,
 )
 from torchmetrics.classification import MulticlassAccuracy
-from utils_testing.utils_testing import assert_equal_dictionaries, create_brick_collection
+from utils_testing.utils_testing import assert_equal_dictionaries, create_dummy_brick_collection, is_equal_model_parameters
 
 
 def test_brick_collection():
     num_classes = 10
-    brick_collection = create_brick_collection(num_classes=num_classes, num_backbone_featues=5)
+    brick_collection = create_dummy_brick_collection(num_classes=num_classes, num_backbone_featues=5)
     expected_forward_named_outputs = {"labels", "raw", "stage", "preprocessed", "features", "predictions"}
     expected_named_losses = {"ce_loss"}
     expected_named_metrics = set(brick_collection["head"]["metrics"].metrics[Stage.TRAIN.name])
@@ -40,13 +41,41 @@ def test_brick_collection():
     assert expected_named_losses == set(losses)
 
 
+def test_save_and_load_brick_collection(tmp_path: Path):
+    num_classes = 10
+    brick_collection = create_dummy_brick_collection(num_classes=num_classes, num_backbone_featues=5)
+    model_checkpoint = bricks.BrickCollection(bricks=copy.deepcopy(brick_collection))
+    with torch.no_grad():
+        model_checkpoint["backbone"].model.conv1.weight[0, 0] = 100
+        model_checkpoint["head"]["classifier"].model.classifier.weight[0, 0] = 10
+    path_model_checkpoint_file = tmp_path / "vanilla.pt"
+    path_model_checkpoint_folder = tmp_path / "model"
+    model_checkpoint.save_bricks(path_model_checkpoint_folder)
+    torch.save(model_checkpoint.state_dict(), path_model_checkpoint_file)
+
+    ## Pytorch save and load ##
+    model = bricks.BrickCollection(bricks=copy.deepcopy(brick_collection))
+    assert not is_equal_model_parameters(model_checkpoint, model)
+    torch.save(model_checkpoint.state_dict(), path_model_checkpoint_file)
+
+    model.load_state_dict(torch.load(path_model_checkpoint_file))
+    assert is_equal_model_parameters(model_checkpoint, model)
+
+    ## torchbricks save and load ##
+    model = bricks.BrickCollection(bricks=copy.deepcopy(brick_collection))
+    assert not is_equal_model_parameters(model_checkpoint, model)
+
+    model.load_bricks(path_model_checkpoint_folder)
+    assert is_equal_model_parameters(model_checkpoint, model)
+
+
 def test_brick_collection_no_metrics():
     num_classes = 10
     expected_forward_named_outputs = {"labels", "raw", "stage", "preprocessed", "features", "predictions"}
     expected_named_losses = {"ce_loss"}
     expected_named_metrics = {}
 
-    brick_collection = create_brick_collection(num_classes=num_classes, num_backbone_featues=5)
+    brick_collection = create_dummy_brick_collection(num_classes=num_classes, num_backbone_featues=5)
     brick_collection["head"].pop("metrics")
     model = bricks.BrickCollection(bricks=brick_collection)
 
@@ -69,7 +98,7 @@ def test_brick_collection_no_metrics_no_losses():
     expected_named_losses = {}
     expected_named_metrics = {}
 
-    brick_collection = create_brick_collection(num_classes=num_classes, num_backbone_featues=5)
+    brick_collection = create_dummy_brick_collection(num_classes=num_classes, num_backbone_featues=5)
     brick_collection["head"].pop("metrics")
     brick_collection["head"].pop("loss")
     model = bricks.BrickCollection(bricks=brick_collection)
@@ -204,7 +233,7 @@ def test_brick_torch_metric_multiple_metric(return_metrics: bool):
 
 def test_brick_collection_print():
     num_classes = 10
-    brick_collection_as_dict = create_brick_collection(num_classes=num_classes, num_backbone_featues=5)
+    brick_collection_as_dict = create_dummy_brick_collection(num_classes=num_classes, num_backbone_featues=5)
     brick_collection = BrickCollection(brick_collection_as_dict)
 
     expected_str = textwrap.dedent("""\
@@ -323,7 +352,7 @@ def test_parse_argument_loss_output_name_indicies():
 
 
 def test_input_names_all():
-    dict_bricks = create_brick_collection(num_classes=3, num_backbone_featues=5)
+    dict_bricks = create_dummy_brick_collection(num_classes=3, num_backbone_featues=5)
 
     class VisualizePredictions(torch.nn.Module):
         def forward(self, named_inputs: Dict[str, Any]):
@@ -353,7 +382,7 @@ def test_using_stage_inside_module():
 
 
 def test_save_and_load_of_brick_collection(tmp_path: Path):
-    brick_collection = create_brick_collection(num_classes=3, num_backbone_featues=10)
+    brick_collection = create_dummy_brick_collection(num_classes=3, num_backbone_featues=10)
     model = BrickCollection(brick_collection)
     path_model = tmp_path / "test_model.pt"
 
@@ -366,7 +395,7 @@ def test_save_and_load_of_brick_collection(tmp_path: Path):
 
 def iterate_stages():
     num_classes = 3
-    brick_collection = create_brick_collection(num_classes=num_classes, num_backbone_featues=10)
+    brick_collection = create_dummy_brick_collection(num_classes=num_classes, num_backbone_featues=10)
     model = BrickCollection(brick_collection)
 
     named_inputs = {"labels": torch.tensor(range(num_classes), dtype=torch.float64), "raw": torch.zeros((3, 24, 24))}
@@ -383,7 +412,7 @@ def test_compile(stage: Stage):
 
     torch._dynamo.config.suppress_errors = True  # TODO: Remove this line later when possible
     num_classes = 3
-    brick_collection = create_brick_collection(num_classes=num_classes, num_backbone_featues=10)
+    brick_collection = create_dummy_brick_collection(num_classes=num_classes, num_backbone_featues=10)
     model = BrickCollection(brick_collection)
 
     named_inputs = {"labels": torch.tensor(range(num_classes), dtype=torch.float64), "raw": torch.zeros((1, 3, 24, 24))}
