@@ -1,4 +1,5 @@
 import copy
+import shutil
 import textwrap
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -42,6 +43,7 @@ def test_brick_collection():
 
 
 def test_save_and_load_brick_collection(tmp_path: Path):
+    # Consider splitting this in multiple tests
     num_classes = 10
     brick_collection = create_dummy_brick_collection(num_classes=num_classes, num_backbone_featues=5)
     model_checkpoint = bricks.BrickCollection(bricks=copy.deepcopy(brick_collection))
@@ -53,7 +55,7 @@ def test_save_and_load_brick_collection(tmp_path: Path):
     model_checkpoint.save_bricks(path_model_checkpoint_folder)
     torch.save(model_checkpoint.state_dict(), path_model_checkpoint_file)
 
-    ## Pytorch save and load ##
+    ## Test: Pytorch save and load ##
     model = bricks.BrickCollection(bricks=copy.deepcopy(brick_collection))
     assert not is_equal_model_parameters(model_checkpoint, model)
     torch.save(model_checkpoint.state_dict(), path_model_checkpoint_file)
@@ -61,12 +63,36 @@ def test_save_and_load_brick_collection(tmp_path: Path):
     model.load_state_dict(torch.load(path_model_checkpoint_file))
     assert is_equal_model_parameters(model_checkpoint, model)
 
-    ## torchbricks save and load ##
+    ## Test: torchbricks save and load ##
     model = bricks.BrickCollection(bricks=copy.deepcopy(brick_collection))
     assert not is_equal_model_parameters(model_checkpoint, model)
 
     model.load_bricks(path_model_checkpoint_folder)
     assert is_equal_model_parameters(model_checkpoint, model)
+
+    # Test: Warnings when model file doesn't exist
+    path_head_classifier = path_model_checkpoint_folder / "head" / "classifier.pt"
+    assert path_head_classifier.exists()
+    path_head_classifier.unlink()
+    with pytest.warns(UserWarning, match="Brick 'head/classifier' has no matching weight file"):
+        model.load_bricks(path_model_checkpoint_folder)
+
+    path_head = path_model_checkpoint_folder / "head"
+    assert path_head.exists()
+    shutil.rmtree(path_head)
+    with pytest.warns(UserWarning, match="Brick 'head/classifier' has no matching weight file"):
+        model.load_bricks(path_model_checkpoint_folder)
+
+    # Test: Check Error being raised when model file is not a directory
+    path_model = path_model_checkpoint_folder / "backbone.pt"
+    assert path_model.exists()
+    with pytest.raises(NotADirectoryError):
+        model.load_bricks(path_model)
+
+    # Test: Check Error being raised when model folder path doesn't exist
+    path_model = Path("buggy_path")
+    with pytest.raises(FileNotFoundError):
+        model.load_bricks(path_model)
 
 
 def test_brick_collection_no_metrics():

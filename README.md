@@ -823,6 +823,7 @@ The main motivation:
   - I have decided to only provide a "path_weights" in each brick collection. Each brick collection will load weights if the weights exists in a given folder. wrong path -> error, missing path -> warning of module (warning), warning in case a file is not used? 
   - Currently, this option supports training sub-node from scratch by removing the weight file from the folder.
   -  [ ] Create an example in README
+  -  [x] Check that warnings are raised when file or model is missing. 
 - [ ] Move parts generic parts from model-trainer to torch-bricks
 - [ ] A user can pass in both stage as a str and as an enum. (It is always a string internally). String makes it easier to jit trace and we
       a user can create self-defined stages. 

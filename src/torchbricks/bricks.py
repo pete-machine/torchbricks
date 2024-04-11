@@ -1,5 +1,6 @@
 import inspect
 import logging
+import warnings
 from abc import ABC, abstractmethod
 from enum import Enum
 from pathlib import Path
@@ -208,7 +209,10 @@ class BrickCollection(nn.ModuleDict):
 
     @typechecked
     def load_bricks(self, path_model_folder: Path):
-        log.info(f"Loading bricks from folder '{path_model_folder}'")
+        if not path_model_folder.exists():
+            raise FileNotFoundError(f"Model directory not found: {path_model_folder}")
+        if not path_model_folder.is_dir():
+            raise NotADirectoryError(f"Model path is not a directory: {path_model_folder}")
         self._load_from_folder(path_base=path_model_folder, nesting=None)
 
     @typechecked
@@ -224,7 +228,7 @@ class BrickCollection(nn.ModuleDict):
                     continue
                 path_folder_brick = (path_model_folder / name).with_suffix(".pt")
                 if not Path(path_folder_brick).exists():
-                    log.warning(f"- Brick '{nesting / name}' has no matching weight file and is initialized from scratch. ")
+                    warnings.warn(f"Brick '{nesting / name}' has no matching weight file and is initialized from scratch. ", stacklevel=1)
                     continue
                 brick.load_state_dict(torch.load(path_folder_brick))
 
