@@ -1,9 +1,10 @@
 from collections import Counter, defaultdict
-from typing import Callable, Dict, List, Optional, Union
+from typing import Callable, Dict, List, Optional, Set, Union
 
 import numpy as np
 import torch
-from torchbricks.bricks import BrickModule, Stage, use_default_style
+from torchbricks import brick_group
+from torchbricks.bricks import BrickModule, use_default_style
 from torchbricks.bricks_helper import name_callable_outputs
 from torchbricks.tensor_conversions import unpack_batched_array_to_arrays, unpack_batched_tensor_to_numpy_format
 from typeguard import typechecked
@@ -37,7 +38,7 @@ class BrickPerImageVisualization(BrickModule):
         input_names: Union[List[str], Dict[str, str]],
         output_names: List[str],
         unpack_functions_for_type: Optional[Dict[type, Optional[Callable]]] = None,
-        alive_stages: Union[List[Stage], str, None] = None,
+        group: Union[Set[str], str] = brick_group.VISUALIZATION,
         unpack_functions_for_input_name: Optional[Dict[str, Optional[Callable]]] = None,
     ):
         """
@@ -63,13 +64,12 @@ class BrickPerImageVisualization(BrickModule):
                and the callable-function receives a torch tensor of shape [C, H, W].
 
         """
-        alive_stages = alive_stages or [Stage.INFERENCE]
         super().__init__(
             model=self.unpack_data,
             input_names=input_names,
             output_names=output_names,
             loss_output_names=[],
-            alive_stages=alive_stages,
+            group=group,
             calculate_gradients=False,
             trainable=False,
         )

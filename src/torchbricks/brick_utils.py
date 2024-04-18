@@ -1,22 +1,23 @@
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional, Set
 
 import torch
 from torch import nn
 from typeguard import typechecked
 
-from torchbricks.bricks import BrickCollection, Stage
+from torchbricks import model_stage
+from torchbricks.bricks import BrickCollection
 
 
 @typechecked
 class _OnnxExportAdaptor(nn.Module):
-    def __init__(self, model: nn.Module, stage: Stage) -> None:
+    def __init__(self, model: nn.Module, groups: Set[str]) -> None:
         super().__init__()
         self.model = model
-        self.stage = stage
+        self.groups = groups or model_stage.EXPORT
 
     def forward(self, named_inputs: Dict[str, Any]):
-        named_outputs = self.model.forward(named_inputs=named_inputs, stage=self.stage, return_inputs=False)
+        named_outputs = self.model.forward(named_inputs=named_inputs, groups=self.groups, return_inputs=False)
         return named_outputs
 
 
@@ -26,11 +27,12 @@ def export_bricks_as_onnx(
     brick_collection: BrickCollection,
     named_inputs: Dict[str, torch.Tensor],
     dynamic_batch_size: bool,
-    stage: Stage = Stage.EXPORT,
+    groups: Optional[Set[str]] = None,
     **onnx_export_kwargs,
 ):
-    outputs = brick_collection(named_inputs=named_inputs, stage=stage, return_inputs=False)
-    onnx_exportable = _OnnxExportAdaptor(model=brick_collection, stage=stage)
+    groups = groups or model_stage.EXPORT
+    outputs = brick_collection(named_inputs=named_inputs, groups=groups, return_inputs=False)
+    onnx_exportable = _OnnxExportAdaptor(model=brick_collection, groups=groups)
     output_names = list(outputs)
     input_names = list(named_inputs)
 

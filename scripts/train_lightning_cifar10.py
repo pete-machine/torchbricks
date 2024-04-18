@@ -37,8 +37,8 @@ def create_cifar_bricks(num_classes: int) -> Dict[str, BrickInterface]:
 
     metrics = torchmetrics.MetricCollection(
         {
-            "MeanAccuracy": classification.MulticlassAccuracy(num_classes=num_classes, average="macro", multiclass=True),
-            "Accuracy": classification.MulticlassAccuracy(num_classes=num_classes, average="micro", multiclass=True),
+            "MeanAccuracy": classification.MulticlassAccuracy(num_classes=num_classes, average="macro"),
+            "Accuracy": classification.MulticlassAccuracy(num_classes=num_classes, average="micro"),
             "ConfMat": torchmetrics.ConfusionMatrix(task="multiclass", num_classes=num_classes),
             "Concatenate": ConcatenatePredictionAndTarget(compute_on_cpu=True),
         }
