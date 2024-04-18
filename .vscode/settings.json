@@ -8,13 +8,16 @@
         "jupytext",
         "nbconvert",
         "nbmake",
+        "ndarray",
         "onnx",
         "pytest",
         "torchbrick",
         "torchbricks",
         "torchmetrics",
         "torchvision",
+        "typechecked",
         "typeguard",
+        "unbatched",
         "wandb"
     ],
     "editor.rulers": [
@@ -24,6 +27,11 @@
         "tests",
         "--capture=no"
     ],
+    "notebook.formatOnSave.enabled": true,
+    "notebook.codeActionsOnSave": {
+        "source.fixAll": true,
+        "source.organizeImports.ruff": true
+    },
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
     "[python]": {
