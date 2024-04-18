@@ -24,9 +24,7 @@ def test_export_onnx_trace(tmp_path: Path):
 
     dynamic_batch_size_configs = [False, True]
     for dynamic_batch_size in dynamic_batch_size_configs:
-        export_bricks_as_onnx(
-            brick_collection=model, named_inputs=named_inputs, path_onnx=path_onnx, dynamic_batch_size=dynamic_batch_size
-        )
+        export_bricks_as_onnx(brick_collection=model, named_inputs=named_inputs, path_onnx=path_onnx, dynamic_batch_size=dynamic_batch_size)
 
         assert path_onnx.exists()
         onnx_model = onnx.load(path_onnx)
