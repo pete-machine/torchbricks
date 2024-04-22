@@ -4,8 +4,8 @@ import onnx
 import pytest
 import torch
 from torchbricks import model_stage
-from torchbricks.brick_utils import export_bricks_as_onnx
-from torchbricks.bricks import BrickCollection
+from torchbricks.brick_collection import BrickCollection
+from torchbricks.brick_collection_utils import export_bricks_as_onnx
 from utils_testing.utils_testing import create_dummy_brick_collection
 
 

@@ -86,7 +86,8 @@ each module similar to a DAG.
 In below code snippet, we demonstrate how this would look for our dummy model. 
 
 ```python
-from torchbricks.bricks import BrickCollection, BrickNotTrainable, BrickTrainable
+from torchbricks.brick_collection import BrickCollection
+from torchbricks.bricks import BrickNotTrainable, BrickTrainable
 
 bricks = {
     "preprocessor": BrickNotTrainable(PreprocessorDummy(), input_names=["raw_images"], output_names=["processed"]),
@@ -561,7 +562,7 @@ Set `dynamic_batch_size=True` to support any batch size inputs and here we expli
 the default.
 
 ```python
-from torchbricks.brick_utils import export_bricks_as_onnx
+from torchbricks.brick_collection_utils import export_bricks_as_onnx
 
 path_build = Path("build")
 path_build.mkdir(exist_ok=True)

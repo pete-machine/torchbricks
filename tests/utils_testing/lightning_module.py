@@ -2,11 +2,12 @@ import copy
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Callable, Dict, Optional
 
 import torch
 from pytorch_lightning import LightningModule
-from torchbricks.bricks import BrickCollection, BrickMetrics, BrickMetricSingle
+from torchbricks.brick_collection import BrickCollection
+from torchbricks.bricks import BrickMetrics, BrickMetricSingle
 from torchbricks.model_stage import DEFAULT_MODEL_STAGE_GROUPS
 
 
@@ -22,7 +23,7 @@ class LightningBrickCollection(LightningModule):
         self,
         path_experiments: Path,
         experiment_name: Optional[str],
-        brick_collection: BrickCollection,
+        brick_collection: "BrickCollection",
         create_optimizers_func: Callable,
     ):
         super().__init__()
@@ -99,6 +100,7 @@ def copy_metric_bricks(brick_collection: BrickCollection) -> BrickCollection:
 
     return brick_collection
 
+
 def per_stage_brick_collections(brick_collection: BrickCollection) -> Dict[str, BrickCollection]:
     # We need to keep metrics separated for each model stage (train, validation, test), we do that by making a brick collection for each
     # stage. Only the metrics are copied to each stage - other bricks are shared. This is necessary because PyTorch Lightning
@@ -107,14 +109,3 @@ def per_stage_brick_collections(brick_collection: BrickCollection) -> Dict[str, 
     # 'on_train_epoch_end'
     metric_stages = [ModelStage.TRAIN, ModelStage.VALIDATION, ModelStage.TEST]
     return torch.nn.ModuleDict({stage.value: BrickCollection(copy_metric_bricks(brick_collection)) for stage in metric_stages})
-
-
-def filter_brick_types(brick_collection: BrickCollection, types: Tuple) -> Dict[str, Any]:
-    brick_collection = copy.copy(brick_collection)
-    metrics = {}
-    for brick_name, brick in brick_collection.items():
-        if isinstance(brick, BrickCollection):
-            metrics[brick_name] = filter_brick_types(brick, types=types)
-        elif isinstance(brick, types):
-            metrics[brick_name] = brick_collection.pop(brick_name)
-    return metrics

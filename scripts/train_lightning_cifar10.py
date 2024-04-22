@@ -14,7 +14,8 @@ from torchbricks.bag_of_bricks.backbones import resnet_to_brick
 from torchbricks.bag_of_bricks.custom_metrics import ConcatenatePredictionAndTarget
 from torchbricks.bag_of_bricks.image_classification import ImageClassifier
 from torchbricks.bag_of_bricks.preprocessors import Preprocessor
-from torchbricks.bricks import BrickCollection, BrickInterface, BrickLoss, BrickMetrics, BrickNotTrainable, BrickTrainable
+from torchbricks.brick_collection import BrickCollection
+from torchbricks.bricks import BrickInterface, BrickLoss, BrickMetrics, BrickNotTrainable, BrickTrainable
 from torchmetrics import classification
 from utils_testing.datamodule_cifar10 import CIFAR10DataModule
 from utils_testing.lightning_module import LightningBrickCollection

@@ -1,9 +1,7 @@
-
-
 from collections.abc import MutableMapping
 from typing import Any, Dict, Optional
 
-from torchbricks.bricks import BrickCollection
+from torchbricks.brick_collection import BrickCollection
 
 
 def _flatten_dict_gen(d, parent_key, sep):

@@ -8,12 +8,6 @@ TEST: Set[str] = {brick_group.MODEL, brick_group.LOSS, brick_group.METRIC, brick
 EXPORT: Set[str] = {brick_group.MODEL}
 INFERENCE: Set[str] = {brick_group.MODEL}
 
-# class ModelStage(Enum):
-#     TRAIN = "train"
-#     VALIDATION = "validation"
-#     TEST = "test"
-#     INFERENCE = "inference"
-
 
 DEFAULT_MODEL_STAGE_GROUPS: Dict[str, Set[str]] = {
     "TRAIN": TRAINING,

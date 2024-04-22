@@ -3,7 +3,8 @@ from typing import Dict
 from torch import nn
 from torchbricks.bag_of_bricks.image_classification import ImageClassifier
 from torchbricks.bag_of_bricks.preprocessors import Preprocessor
-from torchbricks.bricks import BrickCollection, BrickInterface, BrickLoss, BrickMetricSingle, BrickNotTrainable, BrickTrainable
+from torchbricks.brick_collection import BrickCollection
+from torchbricks.bricks import BrickInterface, BrickLoss, BrickMetricSingle, BrickNotTrainable, BrickTrainable
 from torchbricks.graph_plotter import create_mermaid_dag_graph
 from torchmetrics.classification import MulticlassAccuracy
 

@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
-from torchbricks.bricks import BrickCollection, BrickInterface
+from torchbricks.brick_collection import BrickCollection
+from torchbricks.bricks import BrickInterface
 from torchbricks.collection_utils import flatten_dict
 
 
@@ -27,12 +28,12 @@ class Dag:
 
 
 def brick_collection_as_dag(brick_collections: BrickCollection) -> Dag:
-    brick_collections_flat = flatten_dict(brick_collections, sep = "/")
+    brick_collections_flat = flatten_dict(brick_collections, sep="/")
     all_input_names = set()
     all_output_names = set()
     dag_nodes = {}
     for node_name, node in brick_collections_flat.items():
-        dag_nodes[node_name] = Node(name=node_name, brick=node, edges = [])
+        dag_nodes[node_name] = Node(name=node_name, brick=node, edges=[])
         all_input_names = all_input_names.union(node.input_names)
         all_output_names = all_output_names.union(node.output_names)
 

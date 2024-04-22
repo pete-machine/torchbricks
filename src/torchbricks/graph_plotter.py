@@ -1,7 +1,6 @@
-
 from typing import Dict, Union
 
-from torchbricks.bricks import BrickCollection
+from torchbricks.brick_collection import BrickCollection
 from torchbricks.collection_utils import unflatten
 from torchbricks.dag import Dag, Node, brick_collection_as_dag
 
@@ -23,7 +22,6 @@ def create_mermaid_dag_graph(brick_collection: BrickCollection, add_legends: boo
     dag_builder.add_empty_line()
     dag_builder.add_comment("Draw nodes and edges")
     dag_builder.draw_nodes_and_connections(dag_nodes=dag.nodes)
-
 
     dag_builder.add_empty_line()
     dag_builder.add_comment("Add styling")
@@ -48,12 +46,12 @@ class MermaidDagBuilder:  # Pipeline pattern
 
     def add_string(self, string: str, increase_indent_level: bool = False, decrease_indent_level: bool = False):
         if decrease_indent_level:
-            self._indent_level = self._indent_level-1
+            self._indent_level = self._indent_level - 1
 
-        indent_chars = self._indent_char*self._indent_level
+        indent_chars = self._indent_char * self._indent_level
         self._graph_lines.append(indent_chars + string)
         if increase_indent_level:
-            self._indent_level = self._indent_level+1
+            self._indent_level = self._indent_level + 1
 
     def add_empty_line(self):
         self.add_string(string="")
@@ -98,7 +96,7 @@ class MermaidDagBuilder:  # Pipeline pattern
                         string = f"{node.name} --> |{brick_connection.name}| {brick_connection.to_node}"
                     self.add_string(string=string)
 
-    def add_style_from_string(self, style: str, style_name: str, add_to_legends: bool = True ):
+    def add_style_from_string(self, style: str, style_name: str, add_to_legends: bool = True):
         if add_to_legends:
             self._added_legends.append(style_name)
         self.add_string(f"classDef {style_name} {style} ")

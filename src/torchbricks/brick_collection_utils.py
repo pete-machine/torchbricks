@@ -1,12 +1,13 @@
+import copy
 from pathlib import Path
-from typing import Any, Dict, Optional, Set
+from typing import Any, Dict, Optional, Set, Tuple
 
 import torch
 from torch import nn
 from typeguard import typechecked
 
 from torchbricks import model_stage
-from torchbricks.bricks import BrickCollection
+from torchbricks.brick_collection import BrickCollection
 
 
 @typechecked
@@ -52,3 +53,14 @@ def export_bricks_as_onnx(
         output_names=output_names,
         **onnx_export_kwargs,
     )
+
+
+def filter_brick_types(brick_collection: BrickCollection, types: Tuple) -> Dict[str, Any]:
+    brick_collection = copy.copy(brick_collection)
+    metrics = {}
+    for brick_name, brick in brick_collection.items():
+        if isinstance(brick, BrickCollection):
+            metrics[brick_name] = filter_brick_types(brick, types=types)
+        elif isinstance(brick, types):
+            metrics[brick_name] = brick_collection.pop(brick_name)
+    return metrics
