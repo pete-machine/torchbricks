@@ -28,11 +28,15 @@ class BrickInterface(ABC):
     # 67635c,f5e26b,f1dfca,db9d38,dc9097,c4779f,c75239,84bb84,394a89,7d9dc4
     style: Dict[str, str] = use_default_style()
 
-    def __init__(self, input_names: Union[List[str], Dict[str, str]], output_names: List[str], group: Union[Set[str], str]) -> None:
+    def __init__(
+        self, input_names: Union[List[str], Dict[str, str]], output_names: List[str], group: Union[Set[str], List[str], str]
+    ) -> None:
         super().__init__()
 
         self.input_names = input_names
         self.output_names = output_names
+        if isinstance(group, list):
+            group = set(group)
         if isinstance(group, str):
             group = {group}
         self.groups: Set[str] = group
@@ -104,7 +108,7 @@ class BrickModule(nn.Module, BrickInterface):
         model: Union[nn.Module, nn.ModuleDict, Callable],
         input_names: Union[List[str], Dict[str, str]],
         output_names: List[str],
-        group: Union[Set[str], str] = brick_group.MODEL,
+        group: Union[Set[str], List[str], str] = brick_group.MODEL,
         loss_output_names: Union[List[str], str] = "none",
         calculate_gradients: bool = True,
         trainable: bool = True,
@@ -287,7 +291,7 @@ class BrickTrainable(BrickModule):
         input_names: Union[List[str], Dict[str, str]],
         output_names: List[str],
         loss_output_names: Union[List[str], str] = "none",
-        group: Union[Set[str], str] = brick_group.MODEL,
+        group: Union[Set[str], List[str], str] = brick_group.MODEL,
     ):
         super().__init__(
             model=model,
@@ -309,7 +313,7 @@ class BrickNotTrainable(BrickModule):
         model: nn.Module,
         input_names: Union[List[str], Dict[str, str]],
         output_names: List[str],
-        group: Union[Set[str], str] = brick_group.MODEL,
+        group: Union[Set[str], List[str], str] = brick_group.MODEL,
         calculate_gradients: bool = True,
     ):
         super().__init__(
@@ -333,7 +337,7 @@ class BrickLoss(BrickModule):
         input_names: Union[List[str], Dict[str, str]],
         output_names: List[str],
         loss_output_names: Union[List[str], str] = "all",
-        group: Union[Set[str], str] = brick_group.LOSS,
+        group: Union[Set[str], List[str], str] = brick_group.LOSS,
     ):
         super().__init__(
             model=model,
@@ -354,7 +358,7 @@ class BrickMetrics(BrickInterface, nn.Module):
         self,
         metric_collection: Union[MetricCollection, Dict[str, Metric]],
         input_names: Union[List[str], Dict[str, str]],
-        group: Union[Set[str], str] = brick_group.METRIC,
+        group: Union[Set[str], List[str], str] = brick_group.METRIC,
         return_metrics: bool = False,
     ):
         if return_metrics:
@@ -413,7 +417,7 @@ class BrickMetricSingle(BrickMetrics):
         metric: Metric,
         input_names: Union[List[str], Dict[str, str]],
         metric_name: Optional[str] = None,
-        group: Union[Set[str], str] = brick_group.METRIC,
+        group: Union[Set[str], List[str], str] = brick_group.METRIC,
         return_metrics: bool = False,
     ):
         metric_name = metric_name or metric.__class__.__name__

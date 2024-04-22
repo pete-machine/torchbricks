@@ -38,7 +38,7 @@ class BrickPerImageVisualization(BrickModule):
         input_names: Union[List[str], Dict[str, str]],
         output_names: List[str],
         unpack_functions_for_type: Optional[Dict[type, Optional[Callable]]] = None,
-        group: Union[Set[str], str] = brick_group.VISUALIZATION,
+        group: Union[Set[str], List[str], str] = brick_group.VISUALIZATION,
         unpack_functions_for_input_name: Optional[Dict[str, Optional[Callable]]] = None,
     ):
         """
