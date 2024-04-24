@@ -3,7 +3,6 @@ from typing import Dict
 import torch
 import torchmetrics
 from torch import nn
-from torchbricks.bag_of_bricks.custom_metrics import ConcatenatePredictionAndTarget
 from torchbricks.bag_of_bricks.task_utils import TaskInfo
 from torchbricks.bricks import BrickInterface, BrickLoss, BrickMetrics, BrickTrainable
 from torchmetrics import classification
@@ -17,7 +16,7 @@ def create_image_classification_head(n_backbone_features: int, task_info: TaskIn
             "MeanAccuracy": classification.MulticlassAccuracy(num_classes=num_classes, average="macro", multiclass=True),
             "Accuracy": classification.MulticlassAccuracy(num_classes=num_classes, average="micro", multiclass=True),
             "ConfMat": torchmetrics.ConfusionMatrix(task="multiclass", num_classes=num_classes),
-            "Concatenate": ConcatenatePredictionAndTarget(compute_on_cpu=True),
+            # "Concatenate": ConcatenatePredictionAndTarget(compute_on_cpu=True),
         }
     )
     bricks = {

@@ -21,6 +21,9 @@ SUPPORTED_BACKBONES = SUPPORTED_RESNET_BACKBONES
 class BackboneResnet(nn.Module):
     def __init__(self, resnet: ResNet) -> None:
         super().__init__()
+        delattr(resnet, "fc")  # The final classification layer is not used. Remove or unused parameters will raise model warnings/errors
+        delattr(resnet, "avgpool")  # Remove the final average pooling layer. It is not used either
+
         self.resnet = resnet
         self.n_backbone_features = list(resnet.layer4.children())[-1].conv1.weight.shape[1]
 

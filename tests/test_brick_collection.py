@@ -8,7 +8,7 @@ import pytest
 import torch
 import torchbricks.brick_collection
 from torch import nn
-from torchbricks import bricks, model_stage
+from torchbricks import brick_group, bricks, model_stage
 from torchbricks.brick_collection import BrickCollection
 from torchbricks.bricks import BrickModule
 from utils_testing.utils_testing import assert_equal_dictionaries, create_dummy_brick_collection, is_equal_model_parameters
@@ -133,6 +133,31 @@ def test_brick_collection_no_metrics_no_losses():
     assert metrics == expected_named_metrics
     assert expected_forward_named_outputs.union(expected_named_losses) == set(named_outputs)
     assert expected_named_losses == losses
+
+
+def test_brick_collection_to_dict():
+    brick_collection = create_dummy_brick_collection(num_classes=10, num_backbone_featues=5)
+    model = torchbricks.brick_collection.BrickCollection(bricks=brick_collection)
+
+    model_as_dict = model.to_dict()
+    assert isinstance(model_as_dict, dict)
+    assert isinstance(model_as_dict["head"], dict)
+
+    model_as_dict["backbone"].input_names = ["changed"]
+    assert model_as_dict["backbone"].input_names == model["backbone"].input_names
+
+
+def test_brick_collection_sub_collection():
+    brick_collection = create_dummy_brick_collection(num_classes=10, num_backbone_featues=5)
+    model = torchbricks.brick_collection.BrickCollection(bricks=brick_collection)
+
+    model_sub = model.sub_collection()
+    assert model_sub.keys() == model.keys()
+    assert model_sub["head"].keys() == model["head"].keys()
+    assert set(model_sub["head"].keys()) == {"classifier", "loss", "metrics"}
+
+    model_sub = model.sub_collection(groups={brick_group.MODEL})
+    assert set(model_sub["head"].keys()) == {"classifier"}
 
 
 def test_nested_bricks():

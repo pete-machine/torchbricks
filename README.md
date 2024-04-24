@@ -27,8 +27,10 @@ TorchBricks builds pytorch models using small reuseable and decoupled parts - we
 The concept is simple and flexible and allows you to more easily combine, add or swap out parts of the model 
 (preprocessor, backbone, neck, head or post-processor), change the task or extend it with multiple tasks.
 
-TorchBricks is a compact recipe on both *how* model parts are connected and *when* parts are executed 
-during model stages such as training, validation, testing, inference and export.
+TorchBricks is a compact recipe on both *how* model parts are connected and *when* parts should be executed 
+during different model stages such as training, validation, testing, inference and export.
+
+TorchBricks is NOT a framework! - it just a thin abstraction on top of pytorch modules. 
 
 <!-- #region -->
 
@@ -171,22 +173,20 @@ collection and build completely new models from reusable parts.
 
 
 ## Concept 2: Bricks are grouped
-The second concept is that each brick is grouped by specifying a group name for each brick. 
+Another important concept is that bricks can be executed in groups. 
 
-To demonstrate why this is useful, we introduce multiple other bricks; `BrickLoss`, `BrickMetric` and ``
+To demonstrate how and why this is useful, we have added the `group` argument to each brick and introduced `BrickLoss` brick.
 
 ```python
 from torchbricks.bricks import BrickLoss
-from torchbricks.graph_plotter import create_mermaid_dag_graph
 
-num_classes = 3
 bricks = {
     "preprocessor": BrickNotTrainable(PreprocessorDummy(), input_names=["raw_images"], output_names=["processed"], group="MODEL"),
     "backbone": BrickTrainable(
-        TinyModel(n_channels=num_classes, n_features=10), input_names=["processed"], output_names=["embedding"], group="MODEL"
+        TinyModel(n_channels=3, n_features=10), input_names=["processed"], output_names=["embedding"], group="MODEL"
     ),
     "head": BrickTrainable(
-        ClassifierDummy(num_classes=num_classes, in_features=10),
+        ClassifierDummy(num_classes=3, in_features=10),
         input_names=["embedding"],
         output_names=["logits", "softmaxed"],
         group="MODEL",
@@ -202,23 +202,83 @@ print(brick_collection)
 #   (head): BrickTrainable(ClassifierDummy, input_names=['embedding'], output_names=['logits', 'softmaxed'], groups={'MODEL'})
 #   (loss): BrickLoss(CrossEntropyLoss, input_names=['logits', 'targets'], output_names=['loss_ce'], groups={'LOSS'})
 # )
-print(create_mermaid_dag_graph(brick_collection))
+# print(create_mermaid_dag_graph(brick_collection))
 ```
 
-We set `preprocessor`, `backbone` and `head` to be alive on all stages `alive_stages="all"` - this is the default behavior and
-similar to before. 
- 
-For `loss` we set `alive_stages=[Stage.TRAIN, Stage.VALIDATION, Stage.TEST]` to only calculate loss during train, validation and test
-stages. 
+With group names, it is now possible to execute desired subsets of the model 
+during execution by adding `groups`.
+
+Here is a few examples: 
+
+```python
+named_inputs = {"raw_images": batched_images, "targets": torch.ones((batch_size), dtype=torch.int64)}
+
+# With no groups specified, all bricks are executed
+named_outputs = brick_collection(named_inputs=named_inputs)
+
+# With groups specified, only bricks in the specified groups are executed
+named_outputs = brick_collection(named_inputs=named_inputs, groups={"MODEL"})
+```
+
+Groups are important concept in our model recipe as it allows us to specify how model will act during different model stages. 
 
 
-**Graph during train, test and validation:**
 
-During `Stage.TRAIN`, `Stage.VALIDATION` and `Stage.TEST`, the loss module is alive and note now that 
-both `raw_images` and `targets` are required as inputs:
+**Brick collection during inference and export:**
+
+During `Inference` and `Export` model stages, we do not have ground truth labels and we wan to skip loss calculations. 
+
+```python
+# Execution only "MODEL" group bricks
+named_outputs = brick_collection(named_inputs=named_inputs, groups={"MODEL"})
+```
+
+The graph will look like this and note that the graph only requires `raw_images` as input:
+```mermaid
+flowchart LR
+    %% Brick definitions
+    preprocessor(<strong>'preprocessor': PreprocessorDummy</strong><br><i>BrickNotTrainable</i>):::BrickNotTrainable
+    backbone(<strong>'backbone': TinyModel</strong><br><i>BrickTrainable</i>):::BrickTrainable
+    head(<strong>'head': ClassifierDummy</strong><br><i>BrickTrainable</i>):::BrickTrainable
+    
+    %% Draw input and outputs
+    raw_images:::input --> preprocessor
+    
+    %% Draw nodes and edges
+    preprocessor --> |processed| backbone
+    backbone --> |embedding| head
+    head --> logits:::output
+    head --> softmaxed:::output
+    
+    %% Add styling
+    classDef arrow stroke-width:0px,fill-opacity:0.0 
+    classDef input stroke-width:0px,fill-opacity:0.3,fill:#22A699 
+    classDef output stroke-width:0px,fill-opacity:0.3,fill:#F2BE22 
+    classDef BrickNotTrainable stroke-width:0px,fill:#B56576 
+    classDef BrickTrainable stroke-width:0px,fill:#6D597A 
+    
+    %% Add legends
+    subgraph Legends
+        input(input):::input
+        output(output):::output
+    end
+```
 
 
+**Brick collection during train, test and validation:**
 
+During "Train", "Test" and "Validation", `targets` are available and we want to calculate loss to 
+both improve model and track loss curves. 
+
+```python
+# Execution all groups
+named_outputs = brick_collection(named_inputs=named_inputs)
+
+# Or execute explicitly "MODEL" and "LOSS" group bricks
+named_outputs = brick_collection(named_inputs=named_inputs, groups={"MODEL", "LOSS"})
+```
+
+The graph will look like this and note that the graph now requires `raw_images` and `targets` as input:
 
 ```mermaid
 flowchart LR
@@ -246,46 +306,6 @@ flowchart LR
     classDef BrickNotTrainable stroke-width:0px,fill:#B56576 
     classDef BrickTrainable stroke-width:0px,fill:#6D597A 
     classDef BrickLoss stroke-width:0px,fill:#5C677D 
-    
-    %% Add legends
-    subgraph Legends
-        input(input):::input
-        output(output):::output
-    end
-```
-
-
-
-**Graph during inference and export:**
-
-During `Stage.INFERENCE` and `Stage.EXPORT`, the graph will look as before, the loss modules is dead and note that `raw_images` is 
-the only required input
-
-
-
-
-```mermaid
-flowchart LR
-    %% Brick definitions
-    preprocessor(<strong>'preprocessor': PreprocessorDummy</strong><br><i>BrickNotTrainable</i>):::BrickNotTrainable
-    backbone(<strong>'backbone': TinyModel</strong><br><i>BrickTrainable</i>):::BrickTrainable
-    head(<strong>'head': ClassifierDummy</strong><br><i>BrickTrainable</i>):::BrickTrainable
-    
-    %% Draw input and outputs
-    raw_images:::input --> preprocessor
-    
-    %% Draw nodes and edges
-    preprocessor --> |processed| backbone
-    backbone --> |embedding| head
-    head --> logits:::output
-    head --> softmaxed:::output
-    
-    %% Add styling
-    classDef arrow stroke-width:0px,fill-opacity:0.0 
-    classDef input stroke-width:0px,fill-opacity:0.3,fill:#22A699 
-    classDef output stroke-width:0px,fill-opacity:0.3,fill:#F2BE22 
-    classDef BrickNotTrainable stroke-width:0px,fill:#B56576 
-    classDef BrickTrainable stroke-width:0px,fill:#6D597A 
     
     %% Add legends
     subgraph Legends
@@ -454,6 +474,8 @@ We now create the full model containing a `preprocessor`, `backbone` and two ind
 Each head is a dictionary of bricks, making our brick collection a nested dictionary. 
 
 ```python
+from torchbricks.graph_plotter import create_mermaid_dag_graph
+
 n_features = resnet_brick.model.n_backbone_features
 bricks = {
     "preprocessor": BrickNotTrainable(Preprocessor(), input_names=["raw"], output_names=["normalized"]),
@@ -610,12 +632,12 @@ from utils_testing.lightning_module import LightningBrickCollection
 experiment_name = "CIFAR10"
 transform = torchvision.transforms.ToTensor()
 data_module = CIFAR10DataModule(data_dir="data", batch_size=5, num_workers=12, test_transforms=transform, train_transforms=transform)
-create_opimtizer_func = partial(torch.optim.SGD, lr=0.05, momentum=0.9, weight_decay=5e-4)
+create_optimizer_func = partial(torch.optim.SGD, lr=0.05, momentum=0.9, weight_decay=5e-4)
 bricks_lightning_module = LightningBrickCollection(
     path_experiments=Path("build") / "experiments",
     experiment_name=None,
     brick_collection=brick_collection,
-    create_optimizers_func=create_opimtizer_func,
+    create_optimizers_func=create_optimizer_func,
 )
 
 trainer = pl.Trainer(max_epochs=1, limit_train_batches=2, limit_val_batches=2, limit_test_batches=2)
@@ -809,22 +831,6 @@ The main motivation:
 ##
 
 ## What are we missing?
-- [x] Saving-loading brick collections
-  - The user is able to define a model in code and from config (From config require it as an argument in the init-function?)
-  - I have decided to only provide a "path_weights" in each brick collection. Each brick collection will load weights if the weights exists in a given folder. wrong path -> error, missing path -> warning of module (warning), warning in case a file is not used? 
-  - Currently, this option supports training sub-node from scratch by removing the weight file from the folder.
-  -  [x] Create an example in README
-  -  [x] Check that warnings are raised when file or model is missing. 
-- [x] Move parts generic parts from model-trainer to torch-bricks
-- [ ] Copy/paste pytorch lightning trainer to torchbricks? Maybe not
-- [ ] A user can pass in both stage as a str and as an enum. (It is always a string internally). String makes it easier to jit trace and we
-      a user can create self-defined stages. 
-- [ ] Add stage as an internal state and not in the forward pass:
-  - Minor Pros: Tracing (to get onnx model) requires 'torch.Tensors' only as input - we avoid making an adapter class. 
-  - Minor Cons: State gets hidden away - implicit instead of explicit.
-  - Minor Pros: Similar to eval/training in pytorch
-  - Minor Pros: The forward call does not require the user to always pass the stage - less typing.
-Update version!
 - [ ] Demonstrate model configuration with hydra in this document
 - [ ] Make common Visualizations with pillow - not opencv to not blow up the required dependencies. ImageClassification, Segmentation, ObjectDetection
   - [ ] VideoModule to store data as a video

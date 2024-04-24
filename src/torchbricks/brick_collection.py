@@ -82,6 +82,15 @@ class BrickCollection(nn.ModuleDict):
             metrics.update(brick.summarize(reset=reset))
         return metrics
 
+    def sub_collection(self, groups: Optional[Set[str]] = None) -> "BrickCollection":
+        bricks = {}
+        for name, brick in self.items():
+            if isinstance(brick, BrickCollection):
+                bricks[name] = brick.sub_collection(groups=groups)
+            elif brick.run_now(groups=groups):
+                bricks[name] = brick
+        return BrickCollection(bricks)
+
     def to_dict(self) -> Dict[str, Any]:
         bricks_dict = {}
         for name, brick in self.items():
@@ -90,6 +99,7 @@ class BrickCollection(nn.ModuleDict):
             else:
                 bricks_dict[name] = brick
         return bricks_dict
+
 
 @typechecked
 def convert_nested_dict_to_nested_brick_collection(bricks: Dict[str, Union[BrickInterface, Dict]], level=0):

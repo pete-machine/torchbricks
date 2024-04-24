@@ -42,10 +42,11 @@ def test_export_onnx_trace(tmp_path: Path):
 def test_export_torch_jit_script(tmp_path: Path):
     num_classes = 3
     brick_collection = create_dummy_brick_collection(num_classes=num_classes, num_backbone_featues=10)
-    model = BrickCollection(brick_collection)
+
+    model = BrickCollection(brick_collection).to_sub_collection(groups=model_stage.EXPORT)
     named_inputs = {"raw": torch.zeros((1, 3, 64, 64))}
 
-    named_outputs = model(named_inputs, return_inputs=False, groups=model_stage.EXPORT)
+    named_outputs = model(named_inputs, return_inputs=False)
     # remove_from_outputs = ["stage"] + list(named_inputs)
     list(named_inputs)
     list(named_outputs)

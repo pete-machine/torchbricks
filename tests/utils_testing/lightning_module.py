@@ -1,21 +1,12 @@
-import copy
 from datetime import datetime
-from enum import Enum
 from pathlib import Path
-from typing import Callable, Dict, Optional
+from typing import Callable, Optional
 
 import torch
 from pytorch_lightning import LightningModule
 from torchbricks.brick_collection import BrickCollection
-from torchbricks.bricks import BrickMetrics, BrickMetricSingle
-from torchbricks.model_stage import DEFAULT_MODEL_STAGE_GROUPS
-
-
-class ModelStage(Enum):
-    TRAIN = "TRAIN"
-    VALIDATION = "VALIDATION"
-    TEST = "TEST"
-    INFERENCE = "INFERENCE"
+from torchbricks.brick_collection_utils import per_stage_brick_collections
+from torchbricks.model_stage import DEFAULT_MODEL_STAGE_GROUPS, ModelStage
 
 
 class LightningBrickCollection(LightningModule):
@@ -23,7 +14,7 @@ class LightningBrickCollection(LightningModule):
         self,
         path_experiments: Path,
         experiment_name: Optional[str],
-        brick_collection: "BrickCollection",
+        brick_collection: BrickCollection,
         create_optimizers_func: Callable,
     ):
         super().__init__()
@@ -86,26 +77,3 @@ class LightningBrickCollection(LightningModule):
 
     def configure_optimizers(self):
         return self.create_optimizers_func(self.parameters())
-
-
-def copy_metric_bricks(brick_collection: BrickCollection) -> BrickCollection:
-    brick_collection = dict(brick_collection)
-    for brick_name, brick in brick_collection.items():
-        if isinstance(brick, BrickCollection):
-            brick_collection[brick_name] = copy_metric_bricks(brick)
-        elif isinstance(brick, (BrickMetrics, BrickMetricSingle)):
-            # brick_metrics = brick_collection.pop(brick_name)
-            # brick_metrics.metrics = brick_metrics.metrics.clone()
-            brick_collection[brick_name] = copy.deepcopy(brick)
-
-    return brick_collection
-
-
-def per_stage_brick_collections(brick_collection: BrickCollection) -> Dict[str, BrickCollection]:
-    # We need to keep metrics separated for each model stage (train, validation, test), we do that by making a brick collection for each
-    # stage. Only the metrics are copied to each stage - other bricks are shared. This is necessary because PyTorch Lightning
-    # runs all training steps, all validation steps and then 'on_validation_epoch_end' and 'on_train_epoch_end'.
-    # Meaning that all metrics aggregated, summarized and reset in the on_validation_epoch_end and nothing is stored in
-    # 'on_train_epoch_end'
-    metric_stages = [ModelStage.TRAIN, ModelStage.VALIDATION, ModelStage.TEST]
-    return torch.nn.ModuleDict({stage.value: BrickCollection(copy_metric_bricks(brick_collection)) for stage in metric_stages})
