@@ -45,7 +45,7 @@ jobs:
         run: uv build
 
       - name: Publish
-        run: uv publish -t ${{ secrets.PYPI_API_TOKEN }} -u ${{ secrets.PYPI_API_USERNAME }}
+        run: uv publish -t ${{ secrets.PYPI_API_TOKEN }}
 
     # - name: Build and publish
     #   env:
