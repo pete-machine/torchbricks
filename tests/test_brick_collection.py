@@ -8,9 +8,9 @@ import pytest
 import torch
 import torchbricks.brick_collection
 from torch import nn
-from torchbricks import brick_group, bricks, model_stage
+from torchbricks import bricks, model_stage
 from torchbricks.brick_collection import BrickCollection
-from torchbricks.bricks import BrickModule
+from torchbricks.bricks import BrickModule, Tag
 from utils_testing.utils_testing import assert_equal_dictionaries, create_dummy_brick_collection, is_equal_model_parameters
 
 
@@ -98,7 +98,7 @@ def test_brick_collection_no_metrics():
     model = torchbricks.brick_collection.BrickCollection(bricks=brick_collection)
 
     named_inputs = {"labels": torch.tensor(range(num_classes), dtype=torch.float64), "raw": torch.zeros((3, 24, 24))}
-    named_outputs = model(named_inputs=named_inputs, groups=model_stage.INFERENCE)
+    named_outputs = model(named_inputs=named_inputs, tags=model_stage.INFERENCE)
     assert expected_forward_named_outputs == set(named_outputs)
 
     named_outputs = model(named_inputs=named_inputs)
@@ -122,7 +122,7 @@ def test_brick_collection_no_metrics_no_losses():
     model = torchbricks.brick_collection.BrickCollection(bricks=brick_collection)
 
     named_inputs = {"labels": torch.tensor(range(num_classes), dtype=torch.float64), "raw": torch.zeros((3, 24, 24))}
-    named_outputs = model(named_inputs=named_inputs, groups=model_stage.INFERENCE)
+    named_outputs = model(named_inputs=named_inputs, tags=model_stage.INFERENCE)
     assert expected_forward_named_outputs == set(named_outputs)
 
     model(named_inputs=named_inputs)
@@ -156,7 +156,7 @@ def test_brick_collection_sub_collection():
     assert model_sub["head"].keys() == model["head"].keys()
     assert set(model_sub["head"].keys()) == {"classifier", "loss", "metrics"}
 
-    model_sub = model.sub_collection(groups={brick_group.MODEL})
+    model_sub = model.sub_collection(tags={Tag.MODEL})
     assert set(model_sub["head"].keys()) == {"classifier"}
 
 
@@ -225,12 +225,12 @@ def test_brick_collection_print():
 
     expected_str = textwrap.dedent("""\
         BrickCollection(
-          (preprocessor): BrickNotTrainable(Preprocessor, input_names=['raw'], output_names=['preprocessed'], groups={'MODEL'})
-          (backbone): BrickTrainable(TinyBackbone, input_names=['preprocessed'], output_names=['features'], groups={'MODEL'})
+          (preprocessor): BrickNotTrainable(Preprocessor, input_names=['raw'], output_names=['preprocessed'], tags={'MODEL'})
+          (backbone): BrickTrainable(TinyBackbone, input_names=['preprocessed'], output_names=['features'], tags={'MODEL'})
           (head): BrickCollection(
-            (classifier): BrickTrainable(Classifier, input_names=['features'], output_names=['predictions'], groups={'MODEL'})
-            (loss): BrickLoss(CrossEntropyLoss, input_names=['predictions', 'labels'], output_names=['ce_loss'], groups={'LOSS'})
-            (metrics): BrickMetrics(['Accuracy', 'Concatenate', 'ConfMat', 'MeanAccuracy'], input_names=['predictions', 'labels'], output_names=[], groups={'METRIC'})
+            (classifier): BrickTrainable(Classifier, input_names=['features'], output_names=['predictions'], tags={'MODEL'})
+            (loss): BrickLoss(CrossEntropyLoss, input_names=['predictions', 'labels'], output_names=['ce_loss'], tags={'LOSS'})
+            (metrics): BrickMetrics(['Accuracy', 'Concatenate', 'ConfMat', 'MeanAccuracy'], input_names=['predictions', 'labels'], output_names=[], tags={'METRIC'})
           )
         )""")  # noqa: E501
     assert brick_collection.__str__() == expected_str
@@ -320,7 +320,7 @@ def test_no_inputs_or_outputs():
     }
 
     brick_collection = BrickCollection(bricks)
-    brick_collection(named_inputs={"raw": torch.rand((2, 3, 100, 200))}, groups=model_stage.INFERENCE)
+    brick_collection(named_inputs={"raw": torch.rand((2, 3, 100, 200))}, tags=model_stage.INFERENCE)
 
 
 def test_input_names_all():
@@ -333,7 +333,7 @@ def test_input_names_all():
 
     dict_bricks["Visualize"] = bricks.BrickNotTrainable(VisualizePredictions(), input_names=["__all__"], output_names=["visualized"])
     brick_collection = BrickCollection(dict_bricks)
-    brick_collection(named_inputs={"raw": torch.rand((2, 3, 100, 200))}, groups=model_stage.INFERENCE)
+    brick_collection(named_inputs={"raw": torch.rand((2, 3, 100, 200))}, tags=model_stage.INFERENCE)
 
 
 def test_save_and_load_of_brick_collection(tmp_path: Path):
@@ -349,17 +349,17 @@ def test_save_and_load_of_brick_collection(tmp_path: Path):
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("groups", [None, model_stage.INFERENCE])
-def test_compile(groups):
+@pytest.mark.parametrize("tags", [None, model_stage.INFERENCE])
+def test_compile(tags):
     torch._dynamo.config.suppress_errors = True  # TODO: Remove this line later when possible
     num_classes = 3
     brick_collection = create_dummy_brick_collection(num_classes=num_classes, num_backbone_featues=10)
     model = BrickCollection(brick_collection)
 
     named_inputs = {"labels": torch.tensor(range(num_classes), dtype=torch.float64), "raw": torch.zeros((1, 3, 24, 24))}
-    forward_expected = model(named_inputs=named_inputs, groups=groups)
+    forward_expected = model(named_inputs=named_inputs, tags=tags)
 
     model_compiled = torch.compile(model)
-    forward_actual = model_compiled(named_inputs=named_inputs, groups=groups)
+    forward_actual = model_compiled(named_inputs=named_inputs, tags=tags)
 
     assert_equal_dictionaries(forward_expected, forward_actual, is_close=True)

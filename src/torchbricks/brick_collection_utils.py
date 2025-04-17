@@ -14,9 +14,9 @@ from torchbricks.model_stage import ModelStage
 
 @typechecked
 class _OnnxExportAdaptor(nn.Module):
-    def __init__(self, model: nn.Module, groups: Set[str]) -> None:
+    def __init__(self, model: nn.Module, tags: Set[str]) -> None:
         super().__init__()
-        self.model = model.sub_collection(groups=groups)
+        self.model = model.sub_collection(tags=tags)
 
     def forward(self, named_inputs: Dict[str, Any]):
         named_outputs = self.model.forward(named_inputs=named_inputs, return_inputs=False)
@@ -29,12 +29,12 @@ def export_bricks_as_onnx(
     brick_collection: BrickCollection,
     named_inputs: Dict[str, torch.Tensor],
     dynamic_batch_size: bool,
-    groups: Optional[Set[str]] = None,
+    tags: Optional[Set[str]] = None,
     **onnx_export_kwargs,
 ):
-    groups = groups or model_stage.EXPORT
-    outputs = brick_collection(named_inputs=named_inputs, groups=groups, return_inputs=False)
-    onnx_exportable = _OnnxExportAdaptor(model=brick_collection, groups=groups)
+    tags = tags or model_stage.EXPORT
+    outputs = brick_collection(named_inputs=named_inputs, tags=tags, return_inputs=False)
+    onnx_exportable = _OnnxExportAdaptor(model=brick_collection, tags=tags)
     output_names = list(outputs)
     input_names = list(named_inputs)
 

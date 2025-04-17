@@ -3,8 +3,7 @@ from typing import Callable, Dict, List, Optional, Set, Union
 
 import numpy as np
 import torch
-from torchbricks import brick_group
-from torchbricks.bricks import BrickModule, use_default_style
+from torchbricks.bricks import BrickModule, Tag, use_default_style
 from torchbricks.bricks_helper import name_callable_outputs
 from torchbricks.tensor_conversions import unpack_batched_array_to_arrays, unpack_batched_tensor_to_numpy_format
 from typeguard import typechecked
@@ -38,7 +37,7 @@ class BrickPerImageVisualization(BrickModule):
         input_names: Union[List[str], Dict[str, str]],
         output_names: List[str],
         unpack_functions_for_type: Optional[Dict[type, Optional[Callable]]] = None,
-        group: Union[Set[str], List[str], str] = brick_group.VISUALIZATION,
+        tags: Union[Set[str], List[str], str] = Tag.VISUALIZATION,
         unpack_functions_for_input_name: Optional[Dict[str, Optional[Callable]]] = None,
     ):
         """
@@ -69,7 +68,7 @@ class BrickPerImageVisualization(BrickModule):
             input_names=input_names,
             output_names=output_names,
             loss_output_names=[],
-            group=group,
+            tags=tags,
             calculate_gradients=False,
             trainable=False,
         )

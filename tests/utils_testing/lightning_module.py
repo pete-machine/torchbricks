@@ -42,7 +42,7 @@ class LightningBrickCollection(LightningModule):
     def _step(self, stage: ModelStage, batch, batch_idx: int):
         stage_str = stage.value.lower()
         named_inputs = {"raw": batch[0], "targets": batch[1], "batch_idx": batch_idx}
-        named_outputs = self.bricks[stage.value](named_inputs=named_inputs, groups=DEFAULT_MODEL_STAGE_GROUPS[stage.value])
+        named_outputs = self.bricks[stage.value](named_inputs=named_inputs, tags=DEFAULT_MODEL_STAGE_GROUPS[stage.value])
         losses = self.bricks[stage.value].extract_losses(named_outputs=named_outputs)
         loss = 0
         for loss_name, loss_value in losses.items():

@@ -169,58 +169,56 @@ executes each bricks and ensures that the outputs are passed to the inputs of ot
 Structuring the model as a DAG, makes it easy to add/remove outputs for a given module during development, add new modules to the
 collection and build completely new models from reusable parts. 
 - A brick collection is actually a dictionary (`nn.DictModule`). Allowing you to access, pop and update the 
-  collection easily as a regular dictionary. It can also handle nested dictionary, allowing groups of bricks to be added/removed easily. 
+  collection easily as a regular dictionary. It can also handle nested dictionary, allowing tags of bricks to be added/removed easily. 
 
 
 ## Concept 2: Bricks are grouped
-Another important concept is that bricks can be executed in groups. 
+Another important concept is that bricks can be executed in tags. 
 
-To demonstrate how and why this is useful, we have added the `group` argument to each brick and introduced `BrickLoss` brick.
+To demonstrate how and why this is useful, we have added the `tag` argument to each brick and introduced `BrickLoss` brick.
 
 ```python
 from torchbricks.bricks import BrickLoss
 
 bricks = {
-    "preprocessor": BrickNotTrainable(PreprocessorDummy(), input_names=["raw_images"], output_names=["processed"], group="MODEL"),
-    "backbone": BrickTrainable(
-        TinyModel(n_channels=3, n_features=10), input_names=["processed"], output_names=["embedding"], group="MODEL"
-    ),
+    "preprocessor": BrickNotTrainable(PreprocessorDummy(), input_names=["raw_images"], output_names=["processed"], tags="MODEL"),
+    "backbone": BrickTrainable(TinyModel(n_channels=3, n_features=10), input_names=["processed"], output_names=["embedding"], tags="MODEL"),
     "head": BrickTrainable(
         ClassifierDummy(num_classes=3, in_features=10),
         input_names=["embedding"],
         output_names=["logits", "softmaxed"],
-        group="MODEL",
+        tags="MODEL",
     ),
-    "loss": BrickLoss(model=nn.CrossEntropyLoss(), input_names=["logits", "targets"], output_names=["loss_ce"], group="LOSS"),
+    "loss": BrickLoss(model=nn.CrossEntropyLoss(), input_names=["logits", "targets"], output_names=["loss_ce"], tags="LOSS"),
 }
 brick_collection = BrickCollection(bricks)
 
 print(brick_collection)
 # BrickCollection(
-#   (preprocessor): BrickNotTrainable(PreprocessorDummy, input_names=['raw_images'], output_names=['processed'], groups={'MODEL'})
-#   (backbone): BrickTrainable(TinyModel, input_names=['processed'], output_names=['embedding'], groups={'MODEL'})
-#   (head): BrickTrainable(ClassifierDummy, input_names=['embedding'], output_names=['logits', 'softmaxed'], groups={'MODEL'})
-#   (loss): BrickLoss(CrossEntropyLoss, input_names=['logits', 'targets'], output_names=['loss_ce'], groups={'LOSS'})
+#   (preprocessor): BrickNotTrainable(PreprocessorDummy, input_names=['raw_images'], output_names=['processed'], tags={'MODEL'})
+#   (backbone): BrickTrainable(TinyModel, input_names=['processed'], output_names=['embedding'], tags={'MODEL'})
+#   (head): BrickTrainable(ClassifierDummy, input_names=['embedding'], output_names=['logits', 'softmaxed'], tags={'MODEL'})
+#   (loss): BrickLoss(CrossEntropyLoss, input_names=['logits', 'targets'], output_names=['loss_ce'], tags={'LOSS'})
 # )
 # print(create_mermaid_dag_graph(brick_collection))
 ```
 
 With group names, it is now possible to execute desired subsets of the model 
-during execution by adding `groups`.
+during execution by adding `tags`.
 
 Here is a few examples: 
 
 ```python
 named_inputs = {"raw_images": batched_images, "targets": torch.ones((batch_size), dtype=torch.int64)}
 
-# With no groups specified, all bricks are executed
+# With no tags specified, all bricks are executed
 named_outputs = brick_collection(named_inputs=named_inputs)
 
-# With groups specified, only bricks in the specified groups are executed
-named_outputs = brick_collection(named_inputs=named_inputs, groups={"MODEL"})
+# With tags specified, only bricks in the specified tags are executed
+named_outputs = brick_collection(named_inputs=named_inputs, tags={"MODEL"})
 ```
 
-Groups are important concept in our model recipe as it allows us to specify how model will act during different model stages. 
+Tags are important concept in our model recipe as it allows us to specify how model will act during different model stages. 
 
 
 
@@ -230,7 +228,7 @@ During `Inference` and `Export` model stages, we do not have ground truth labels
 
 ```python
 # Execution only "MODEL" group bricks
-named_outputs = brick_collection(named_inputs=named_inputs, groups={"MODEL"})
+named_outputs = brick_collection(named_inputs=named_inputs, tags={"MODEL"})
 ```
 
 The graph will look like this and note that the graph only requires `raw_images` as input:
@@ -271,11 +269,11 @@ During "Train", "Test" and "Validation", `targets` are available and we want to 
 both improve model and track loss curves. 
 
 ```python
-# Execution all groups
+# Execution all tags
 named_outputs = brick_collection(named_inputs=named_inputs)
 
 # Or execute explicitly "MODEL" and "LOSS" group bricks
-named_outputs = brick_collection(named_inputs=named_inputs, groups={"MODEL", "LOSS"})
+named_outputs = brick_collection(named_inputs=named_inputs, tags={"MODEL", "LOSS"})
 ```
 
 The graph will look like this and note that the graph now requires `raw_images` and `targets` as input:

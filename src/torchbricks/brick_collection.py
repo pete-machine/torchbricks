@@ -15,14 +15,14 @@ class BrickCollection(nn.ModuleDict):
         resolve_relative_names(bricks=bricks)
         super().__init__(convert_nested_dict_to_nested_brick_collection(bricks))
 
-    def forward(self, named_inputs: Dict[str, Any], groups: Optional[Set[str]] = None, return_inputs: bool = True) -> Dict[str, Any]:
+    def forward(self, named_inputs: Dict[str, Any], tags: Optional[Set[str]] = None, return_inputs: bool = True) -> Dict[str, Any]:
         gathered_named_io = dict(named_inputs)  # To keep the argument `named_inputs` unchanged
 
         for brick in self.values():
             if isinstance(brick, BrickCollection):
-                gathered_named_io.update(brick.forward(named_inputs=gathered_named_io, groups=groups))
+                gathered_named_io.update(brick.forward(named_inputs=gathered_named_io, tags=tags))
             else:
-                if brick.run_now(groups=groups):
+                if brick.run_now(tags=tags):
                     results = brick.forward(named_inputs=gathered_named_io)
                     gathered_named_io.update(results)
 
@@ -82,12 +82,12 @@ class BrickCollection(nn.ModuleDict):
             metrics.update(brick.summarize(reset=reset))
         return metrics
 
-    def sub_collection(self, groups: Optional[Set[str]] = None) -> "BrickCollection":
+    def sub_collection(self, tags: Optional[Set[str]] = None) -> "BrickCollection":
         bricks = {}
         for name, brick in self.items():
             if isinstance(brick, BrickCollection):
-                bricks[name] = brick.sub_collection(groups=groups)
-            elif brick.run_now(groups=groups):
+                bricks[name] = brick.sub_collection(tags=tags)
+            elif brick.run_now(tags=tags):
                 bricks[name] = brick
         return BrickCollection(bricks)
 
@@ -132,7 +132,7 @@ def _resolve_input_or_output_names(
             if len(input_name_as_path.parents) == 1:
                 raise ValueError(
                     f'Failed to resolve input name. Unable to resolve "{input_name}" in brick "{parent.relative_to("/root")}" '
-                    'to an actual name. '
+                    "to an actual name. "
                 )
             input_name = str(input_name_as_path.relative_to("/root"))
         input_names_resolved.append(input_name)

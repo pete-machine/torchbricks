@@ -15,7 +15,7 @@ def test_export_onnx_trace(tmp_path: Path):
     model = BrickCollection(brick_collection)
     named_inputs = {"raw": torch.zeros((1, 3, 64, 64))}
 
-    named_outputs = model(named_inputs, groups=model_stage.EXPORT, return_inputs=False)
+    named_outputs = model(named_inputs, tags=model_stage.EXPORT, return_inputs=False)
     # remove_from_outputs = ["stage"] + list(named_inputs)
     expected_input = list(named_inputs)
     expected_outputs = list(named_outputs)
@@ -43,7 +43,7 @@ def test_export_torch_jit_script(tmp_path: Path):
     num_classes = 3
     brick_collection = create_dummy_brick_collection(num_classes=num_classes, num_backbone_featues=10)
 
-    model = BrickCollection(brick_collection).to_sub_collection(groups=model_stage.EXPORT)
+    model = BrickCollection(brick_collection).to_sub_collection(tags=model_stage.EXPORT)
     named_inputs = {"raw": torch.zeros((1, 3, 64, 64))}
 
     named_outputs = model(named_inputs, return_inputs=False)

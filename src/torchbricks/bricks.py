@@ -7,10 +7,17 @@ from torch import nn
 from torchmetrics import Metric, MetricCollection
 from typeguard import typechecked
 
-from torchbricks import brick_group
 from torchbricks.bricks_helper import named_input_and_outputs_callable, parse_argument_loss_output_name_indices
 
 log = logging.getLogger(__name__)
+
+
+class Tag:
+    MODEL = "MODEL"
+    LOSS = "LOSS"
+    METRIC = "METRIC"
+    METRIC_EXTRA = "METRIC_EXTRA"
+    VISUALIZATION = "VISUALIZATION"
 
 
 def use_default_style(overwrites: Optional[Dict[str, str]] = None):
@@ -26,25 +33,25 @@ class BrickInterface(ABC):
     style: Dict[str, str] = use_default_style()
 
     def __init__(
-        self, input_names: Union[List[str], Dict[str, str]], output_names: List[str], group: Union[Set[str], List[str], str]
+        self, input_names: Union[List[str], Dict[str, str]], output_names: List[str], tags: Union[Set[str], List[str], str]
     ) -> None:
         super().__init__()
 
         self.input_names = input_names
         self.output_names = output_names
-        if isinstance(group, list):
-            group = set(group)
-        if isinstance(group, str):
-            group = {group}
-        self.groups: Set[str] = group
+        if isinstance(tags, list):
+            tags = set(tags)
+        if isinstance(tags, str):
+            tags = {tags}
+        self.tags: Set[str] = tags
 
-    def run_now(self, groups: Optional[Set[str]]) -> bool:
-        if groups is None:
+    def run_now(self, tags: Optional[Set[str]]) -> bool:
+        if tags is None:
             return True
-        return len(self.groups.intersection(groups)) > 0
+        return len(self.tags.intersection(tags)) > 0
 
-    def __call__(self, named_inputs: Dict[str, Any], groups: Optional[Set[str]]) -> Dict[str, Any]:
-        return self.forward(named_inputs=named_inputs, groups=groups)
+    def __call__(self, named_inputs: Dict[str, Any]) -> Dict[str, Any]:
+        return self.forward(named_inputs=named_inputs)
 
     @abstractmethod
     def forward(self, named_inputs: Dict[str, Any]) -> Dict[str, Any]:
@@ -78,8 +85,8 @@ class BrickInterface(ABC):
     def __repr__(self) -> str:
         input_names = self.input_names
         output_names = self.output_names
-        groups = self.groups
-        return f"{self.get_brick_type()}({self.get_module_name()}, {input_names=}, {output_names=}, {groups=})"
+        tags = self.tags
+        return f"{self.get_brick_type()}({self.get_module_name()}, {input_names=}, {output_names=}, {tags=})"
 
 
 @typechecked
@@ -91,13 +98,13 @@ class BrickModule(nn.Module, BrickInterface):
         model: Union[nn.Module, nn.ModuleDict, Callable],
         input_names: Union[List[str], Dict[str, str]],
         output_names: List[str],
-        group: Union[Set[str], List[str], str] = brick_group.MODEL,
+        tags: Union[Set[str], List[str], str] = Tag.MODEL,
         loss_output_names: Union[List[str], str] = "none",
         calculate_gradients: bool = True,
         trainable: bool = True,
     ) -> None:
         nn.Module.__init__(self)
-        BrickInterface.__init__(self, input_names=input_names, output_names=output_names, group=group)
+        BrickInterface.__init__(self, input_names=input_names, output_names=output_names, tags=tags)
         self.model = model
         self.loss_output_indices = parse_argument_loss_output_name_indices(loss_output_names, available_output_names=output_names)
         self.calculate_gradients = calculate_gradients
@@ -137,14 +144,14 @@ class BrickTrainable(BrickModule):
         input_names: Union[List[str], Dict[str, str]],
         output_names: List[str],
         loss_output_names: Union[List[str], str] = "none",
-        group: Union[Set[str], List[str], str] = brick_group.MODEL,
+        tags: Union[Set[str], List[str], str] = Tag.MODEL,
     ):
         super().__init__(
             model=model,
             input_names=input_names,
             output_names=output_names,
             loss_output_names=loss_output_names,
-            group=group,
+            tags=tags,
             calculate_gradients=True,
             trainable=True,
         )
@@ -159,7 +166,7 @@ class BrickNotTrainable(BrickModule):
         model: nn.Module,
         input_names: Union[List[str], Dict[str, str]],
         output_names: List[str],
-        group: Union[Set[str], List[str], str] = brick_group.MODEL,
+        tags: Union[Set[str], List[str], str] = Tag.MODEL,
         calculate_gradients: bool = True,  # To allow gradients to pass through a non-trainable model
     ):
         super().__init__(
@@ -167,7 +174,7 @@ class BrickNotTrainable(BrickModule):
             input_names=input_names,
             output_names=output_names,
             loss_output_names="none",
-            group=group,
+            tags=tags,
             calculate_gradients=calculate_gradients,
             trainable=False,
         )
@@ -183,14 +190,14 @@ class BrickLoss(BrickModule):
         input_names: Union[List[str], Dict[str, str]],
         output_names: List[str],
         loss_output_names: Union[List[str], str] = "all",
-        group: Union[Set[str], List[str], str] = brick_group.LOSS,
+        tags: Union[Set[str], List[str], str] = Tag.LOSS,
     ):
         super().__init__(
             model=model,
             input_names=input_names,
             output_names=output_names,
             loss_output_names=loss_output_names,
-            group=group,
+            tags=tags,
             calculate_gradients=True,
             trainable=True,
         )
@@ -204,7 +211,7 @@ class BrickMetrics(BrickInterface, nn.Module):
         self,
         metric_collection: Union[MetricCollection, Dict[str, Metric]],
         input_names: Union[List[str], Dict[str, str]],
-        group: Union[Set[str], List[str], str] = brick_group.METRIC,
+        tags: Union[Set[str], List[str], str] = Tag.METRIC,
         return_metrics: bool = False,
     ):
         if return_metrics:
@@ -212,7 +219,7 @@ class BrickMetrics(BrickInterface, nn.Module):
         else:
             output_names = []
 
-        BrickInterface.__init__(self, input_names=input_names, output_names=output_names, group=group)
+        BrickInterface.__init__(self, input_names=input_names, output_names=output_names, tags=tags)
         nn.Module.__init__(self)
 
         if isinstance(metric_collection, dict):
@@ -263,8 +270,8 @@ class BrickMetricSingle(BrickMetrics):
         metric: Metric,
         input_names: Union[List[str], Dict[str, str]],
         metric_name: Optional[str] = None,
-        group: Union[Set[str], List[str], str] = brick_group.METRIC,
+        tags: Union[Set[str], List[str], str] = Tag.METRIC,
         return_metrics: bool = False,
     ):
         metric_name = metric_name or metric.__class__.__name__
-        super().__init__(metric_collection={metric_name: metric}, input_names=input_names, group=group, return_metrics=return_metrics)
+        super().__init__(metric_collection={metric_name: metric}, input_names=input_names, tags=tags, return_metrics=return_metrics)

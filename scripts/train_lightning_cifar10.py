@@ -106,7 +106,7 @@ if __name__ == "__main__":
     )
 
     data_module = CIFAR10DataModule(
-        data_dir="data",
+        data_dir="data/datasets",
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         test_transforms=test_transforms,
@@ -132,7 +132,7 @@ if __name__ == "__main__":
         brick_collection=brick_collection,
         create_optimizers_func=create_optimizers_func,
     )
-    logger = WandbLogger(name=experiment_name, project=PROJECT)
+    logger = WandbLogger(name=experiment_name, project=PROJECT, save_dir="data/runs")
     trainer = Trainer(accelerator=args.accelerator, logger=logger, max_epochs=args.max_epochs)
     trainer.fit(bricks_lightning_module, train_dataloaders=data_module.train_dataloader(), val_dataloaders=data_module.val_dataloader())
     trainer.test(bricks_lightning_module, datamodule=data_module)

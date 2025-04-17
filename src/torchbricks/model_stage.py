@@ -1,13 +1,13 @@
 from enum import Enum
 from typing import Dict, Set
 
-from torchbricks import brick_group
+from torchbricks.bricks import Tag
 
-TRAINING: Set[str] = {brick_group.MODEL, brick_group.LOSS, brick_group.METRIC}
-VALIDATION: Set[str] = {brick_group.MODEL, brick_group.LOSS, brick_group.METRIC}
-TEST: Set[str] = {brick_group.MODEL, brick_group.LOSS, brick_group.METRIC, brick_group.METRIC_EXTRA}
-EXPORT: Set[str] = {brick_group.MODEL}
-INFERENCE: Set[str] = {brick_group.MODEL}
+TRAINING: Set[str] = {Tag.MODEL, Tag.LOSS, Tag.METRIC}
+VALIDATION: Set[str] = {Tag.MODEL, Tag.LOSS, Tag.METRIC}
+TEST: Set[str] = {Tag.MODEL, Tag.LOSS, Tag.METRIC, Tag.METRIC_EXTRA}
+EXPORT: Set[str] = {Tag.MODEL}
+INFERENCE: Set[str] = {Tag.MODEL}
 
 
 class ModelStage(Enum):
