@@ -33,7 +33,7 @@ jobs:
       - name: Install the project
         run: uv sync --all-extras --dev
       - name: Test with python ${{ matrix.python-version }}
-        run: uv run --frozen pytest
+        run: make test-all
       - name: "Upload coverage to Codecov"
         uses: codecov/codecov-action@v3
         with:
