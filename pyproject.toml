@@ -1,6 +1,6 @@
 [project]
 name = "torchbricks"
-version = "0.3.0"
+version = "0.4.0"
 description = "Decoupled and modular approach to building multi-task ML models using a single model recipe for all model stages"
 readme = "README.md"
 authors = [{ name = "Peter Hviid Christiansen", email = "PeterHviidChristiansen@gmail.com" }]
@@ -43,7 +43,7 @@ Homepage = "https://github.com/pete-machine/torchbricks"
 
 # bumpver update --patch | --minor | --major --dry
 [tool.bumpver]
-current_version = "0.3.0"
+current_version = "0.4.0"
 version_pattern = "MAJOR.MINOR.PATCH"
 commit_message  = "Bump version {old_version} -> {new_version}"
 commit          = true
