@@ -4,6 +4,7 @@ from typing import Callable, Optional
 
 import torch
 from pytorch_lightning import LightningModule
+
 from torchbricks.brick_collection import BrickCollection
 from torchbricks.brick_collection_utils import per_stage_brick_collections
 from torchbricks.model_stage import DEFAULT_MODEL_STAGE_GROUPS, ModelStage

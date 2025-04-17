@@ -1,4 +1,5 @@
 import torch
+
 from torchbricks.bag_of_bricks.image_classification import ImageClassifier
 
 

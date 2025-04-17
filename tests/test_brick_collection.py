@@ -6,12 +6,13 @@ from typing import Any, Dict
 
 import pytest
 import torch
-import torchbricks.brick_collection
 from torch import nn
+from utils_testing.utils_testing import assert_equal_dictionaries, create_dummy_brick_collection, is_equal_model_parameters
+
+import torchbricks.brick_collection
 from torchbricks import bricks, model_stage
 from torchbricks.brick_collection import BrickCollection
 from torchbricks.bricks import BrickModule, Tag
-from utils_testing.utils_testing import assert_equal_dictionaries, create_dummy_brick_collection, is_equal_model_parameters
 
 
 def test_brick_collection():

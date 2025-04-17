@@ -1,6 +1,7 @@
 import pytest
 import torch
 import torchvision
+
 from torchbricks.bag_of_bricks.backbones import SUPPORTED_BACKBONES, create_backbone, resnet_to_brick
 
 

@@ -3,9 +3,10 @@ from typing import Dict
 import torch
 import torchmetrics
 from torch import nn
+from torchmetrics import classification
+
 from torchbricks.bag_of_bricks.task_utils import TaskInfo
 from torchbricks.bricks import BrickInterface, BrickLoss, BrickMetrics, BrickTrainable
-from torchmetrics import classification
 
 
 def create_image_classification_head(n_backbone_features: int, task_info: TaskInfo, input_name: str) -> Dict[str, BrickInterface]:

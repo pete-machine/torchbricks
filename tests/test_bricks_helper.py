@@ -1,6 +1,7 @@
 from typing import Any, Dict, Tuple
 
 import pytest
+
 from torchbricks.bricks_helper import named_input_and_outputs_callable, parse_argument_loss_output_name_indices
 
 

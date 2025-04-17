@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 import torch
 from PIL import Image
+
 from torchbricks.tensor_conversions import (
     batched_tensor_to_channel_last,
     function_composer,

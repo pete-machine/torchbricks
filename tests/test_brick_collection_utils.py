@@ -3,10 +3,11 @@ from pathlib import Path
 import onnx
 import pytest
 import torch
+from utils_testing.utils_testing import create_dummy_brick_collection
+
 from torchbricks import model_stage
 from torchbricks.brick_collection import BrickCollection
 from torchbricks.brick_collection_utils import export_bricks_as_onnx
-from utils_testing.utils_testing import create_dummy_brick_collection
 
 
 def test_export_onnx_trace(tmp_path: Path):

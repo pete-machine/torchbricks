@@ -1,7 +1,8 @@
 import torchvision
 from torch import Tensor, nn
-from torchbricks.bricks import BrickTrainable
 from torchvision.models import ResNet
+
+from torchbricks.bricks import BrickTrainable
 
 SUPPORTED_RESNET_BACKBONES = [
     "resnet18",

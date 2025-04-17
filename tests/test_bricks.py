@@ -4,6 +4,8 @@ import pytest
 import torch
 import torchmetrics
 from torch import nn
+from torchmetrics.classification import MulticlassAccuracy
+
 from torchbricks.bag_of_bricks import custom_metrics
 from torchbricks.brick_collection import BrickCollection
 from torchbricks.bricks import (
@@ -11,7 +13,6 @@ from torchbricks.bricks import (
     BrickMetrics,
     BrickMetricSingle,
 )
-from torchmetrics.classification import MulticlassAccuracy
 
 
 @pytest.mark.parametrize("metric_name", ("accuracy", None))

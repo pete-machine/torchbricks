@@ -3,12 +3,13 @@ from typing import Any, Dict, Tuple
 import numpy as np
 import pytest
 import torch
-import torchbricks.bag_of_bricks.brick_visualizer
 from PIL import Image, ImageDraw, ImageFont
-from torchbricks.bag_of_bricks.brick_visualizer import BrickPerImageVisualization
-from torchbricks.tensor_conversions import unpack_batched_tensor_to_pillow_images
 from typeguard import typechecked
 from utils_testing.utils_testing import path_repo_root
+
+import torchbricks.bag_of_bricks.brick_visualizer
+from torchbricks.bag_of_bricks.brick_visualizer import BrickPerImageVisualization
+from torchbricks.tensor_conversions import unpack_batched_tensor_to_pillow_images
 
 
 def test_draw_image_classification():

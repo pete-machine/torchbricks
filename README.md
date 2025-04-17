@@ -342,11 +342,12 @@ The used of TorchMetrics in a brick collection is demonstrated in below code sni
 
 ```python
 import torchvision
+from torchmetrics.classification import MulticlassAccuracy
+
 from torchbricks.bag_of_bricks.backbones import resnet_to_brick
 from torchbricks.bag_of_bricks.image_classification import ImageClassifier
 from torchbricks.bag_of_bricks.preprocessors import Preprocessor
 from torchbricks.bricks import BrickLoss, BrickMetricSingle
-from torchmetrics.classification import MulticlassAccuracy
 
 num_classes = 10
 resnet = torchvision.models.resnet18(weights=None, num_classes=num_classes)
@@ -380,7 +381,8 @@ for named_inputs in dataloader_simulated:  # Simulates iterating over the datase
 
 metrics = brick_collection.summarize(reset=True)
 print(f"{named_outputs.keys()=}")
-# named_outputs.keys()=dict_keys(['raw', 'targets', 'stage', 'normalized', 'features', 'logits', 'probabilities', 'class_prediction', 'loss_ce'])
+# named_outputs.keys()=dict_keys(['raw', 'targets', 'stage', 'normalized', 'features', 'logits', 'probabilities'
+# , 'class_prediction', 'loss_ce'])
 print(f"{metrics=}")
 # metrics={'MulticlassAccuracy': tensor(0.)}
 ```
@@ -428,11 +430,11 @@ torch.save(brick_collection.state_dict(), path_model)
 brick_collection.load_state_dict(torch.load(path_model))
 
 # Iterate all parameters
-for name, params in brick_collection.named_parameters():
+for name, params in brick_collection.named_parameters():  # noqa: B007
     pass
 
 # Iterate all layers
-for name, module in brick_collection.named_modules():
+for name, module in brick_collection.named_modules():  # noqa: B007
     pass
 
 # Using compile with pytorch >= 2.0
@@ -699,6 +701,7 @@ The callable visualizes image classification predictions using pillow and requir
 ```python
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
+
 from torchbricks.tensor_conversions import float2uint8
 
 
