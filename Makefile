@@ -7,44 +7,21 @@ PYTHONPATH=PYTHONPATH=$(shell pwd)/src:$(shell pwd)/tests
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-25s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: show
-show: ## Show the current environment.
-	@echo "Current environment:"
-	@micromamba info
-
 .PHONY: lint
 lint: ## Perform linting on all files using pre-commit
-	pre-commit run --all-files
-
-.PHONY: env-install
-env-install: ## create environment using lock-file
-	micromamba create --name torchbricks --file conda-linux-64.lock
-
-.PHONY: env-install-min
-env-install-min: ## create environment using lock-file
-	micromamba create --name torchbricks_low --file environment-min.yml
-
-.PHONY: env-create-lock-file
-env-create-lock-file: ## Update lock file using the specification in 'environment.yml'
-	@set -e
-	conda-lock -k explicit --conda micromamba -f environment.yml
-	cp environment.yml tests/data/copy_lock_filed_environment.yml
-
-
-.PHONY: env-create-lock-and-install
-env-create-lock-and-install: env-create-lock-file env-install ## Update lock file and environment using the specification in 'environment.yml'
+	uv run --frozen pre-commit run --all-files
 
 .PHONY: test-all
 test-all: ## Run tests and generate coverage report.
 	@set -e
-	$(PYTHONPATH) pytest -v --cov-config .coveragerc --cov=src -l --tb=short --maxfail=1 --durations=0 tests/
+	$(PYTHONPATH) uv run --frozen pytest -v --cov-config .coveragerc --cov=src -l --tb=short --maxfail=1 --durations=0 tests/
 	coverage xml
 	coverage html
 
 
 .PHONY: test
 test:
-	$(PYTHONPATH) pytest --durations=0 -m "not slow" tests/
+	$(PYTHONPATH) uv run --frozen pytest --durations=0 -m "not slow" tests/
 
 .PHONY: train-cifar10
 train-cifar10: ## Run CIFAR10 training

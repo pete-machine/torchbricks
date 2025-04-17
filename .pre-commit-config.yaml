@@ -10,11 +10,13 @@ repos:
         exclude: "README.md"
     # -   id: check-yaml
     -   id: check-added-large-files
+        args: [--maxkb=5000]
     -   id: check-merge-conflict
     -   id: check-ast
     -   id: debug-statements
     -   id: check-toml
     -   id: check-json
+        exclude: ".vscode/launch.json"
     -   id: check-xml
 
 

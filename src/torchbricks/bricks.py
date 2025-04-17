@@ -160,7 +160,7 @@ class BrickNotTrainable(BrickModule):
         input_names: Union[List[str], Dict[str, str]],
         output_names: List[str],
         group: Union[Set[str], List[str], str] = brick_group.MODEL,
-        calculate_gradients: bool = True,
+        calculate_gradients: bool = True,  # To allow gradients to pass through a non-trainable model
     ):
         super().__init__(
             model=model,
