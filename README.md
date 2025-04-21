@@ -172,10 +172,10 @@ collection and build completely new models from reusable parts.
   collection easily as a regular dictionary. It can also handle nested dictionary, allowing tags of bricks to be added/removed easily. 
 
 
-## Concept 2: Bricks are grouped
+## Concept 2: Bricks are tagged
 Another important concept is that bricks can be executed in tags. 
 
-To demonstrate how and why this is useful, we have added the `tag` argument to each brick and introduced `BrickLoss` brick.
+To demonstrate how and why this is useful, we have added the `tags` argument to each brick and introduced `BrickLoss` brick.
 
 ```python
 from torchbricks.bricks import BrickLoss
@@ -203,8 +203,7 @@ print(brick_collection)
 # print(create_mermaid_dag_graph(brick_collection))
 ```
 
-With group names, it is now possible to execute desired subsets of the model 
-during execution by adding `tags`.
+With tags, it is now possible to execute desired subsets of the model  during execution by adding `tags`.
 
 Here is a few examples: 
 
@@ -214,7 +213,7 @@ named_inputs = {"raw_images": batched_images, "targets": torch.ones((batch_size)
 # With no tags specified, all bricks are executed
 named_outputs = brick_collection(named_inputs=named_inputs)
 
-# With tags specified, only bricks in the specified tags are executed
+# With tags specified, only bricks with the specified tags are executed
 named_outputs = brick_collection(named_inputs=named_inputs, tags={"MODEL"})
 ```
 
@@ -856,12 +855,13 @@ Read the [CONTRIBUTING.md](CONTRIBUTING.md) file.
 
 ### Install
 
-    conda create --name torchbricks --file conda-linux-64.lock
-    conda activate torchbricks
-    poetry install
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+
+    uv sync 
 
 ### Activating the environment
 
-    conda activate torchbricks
+    uv run python [SOME_SCRIPT]
+    uv run make [SOME_MAKE_CMD]
 
 <!-- #endregion -->
