@@ -5,7 +5,8 @@ import numpy as np
 import torch
 from typeguard import typechecked
 
-from torchbricks.bricks import BrickModule, Tag, use_default_style
+from torchbricks.brick_tags import Tag
+from torchbricks.bricks import BrickModule, use_default_style
 from torchbricks.bricks_helper import name_callable_outputs
 from torchbricks.tensor_conversions import unpack_batched_array_to_arrays, unpack_batched_tensor_to_numpy_format
 

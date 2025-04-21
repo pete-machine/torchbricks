@@ -7,7 +7,7 @@ from pytorch_lightning import LightningModule
 
 from torchbricks.brick_collection import BrickCollection
 from torchbricks.brick_collection_utils import per_stage_brick_collections
-from torchbricks.model_stage import DEFAULT_MODEL_STAGE_GROUPS, ModelStage
+from torchbricks.brick_tags import DEFAULT_MODEL_STAGE_TAGS, ModelStage
 
 
 class LightningBrickCollection(LightningModule):
@@ -25,13 +25,13 @@ class LightningBrickCollection(LightningModule):
         self.path_experiment = path_experiments / experiment_name
         self.path_experiment.mkdir(parents=True)
 
-        # self.model_stage_groups = DEFAULT_MODEL_STAGE_GROUPS
+        self.model_stage_tags = DEFAULT_MODEL_STAGE_TAGS
         self.bricks = per_stage_brick_collections(brick_collection)
 
         self.create_optimizers_func = create_optimizers_func
 
     def _on_epoch_end(self, stage: ModelStage):
-        metrics = self.bricks[stage.value].summarize(reset=True)
+        metrics = self.bricks[stage.name].summarize(reset=True)
 
         def is_single_value(tensor):
             return isinstance(tensor, torch.Tensor) and tensor.ndim == 0
@@ -43,8 +43,8 @@ class LightningBrickCollection(LightningModule):
     def _step(self, stage: ModelStage, batch, batch_idx: int):
         stage_str = stage.value.lower()
         named_inputs = {"raw": batch[0], "targets": batch[1], "batch_idx": batch_idx}
-        named_outputs = self.bricks[stage.value](named_inputs=named_inputs, tags=DEFAULT_MODEL_STAGE_GROUPS[stage.value])
-        losses = self.bricks[stage.value].extract_losses(named_outputs=named_outputs)
+        named_outputs = self.bricks[stage.name](named_inputs=named_inputs, tags=self.model_stage_tags[stage.name])
+        losses = self.bricks[stage.name].extract_losses(named_outputs=named_outputs)
         loss = 0
         for loss_name, loss_value in losses.items():
             self.log(f"{stage_str}/{loss_name}", loss_value)

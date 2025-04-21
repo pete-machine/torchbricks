@@ -6,15 +6,14 @@ import torch
 from torch import nn
 from typeguard import typechecked
 
-from torchbricks import model_stage
 from torchbricks.brick_collection import BrickCollection
+from torchbricks.brick_tags import ModelStage
 from torchbricks.bricks import BrickMetrics, BrickMetricSingle
-from torchbricks.model_stage import ModelStage
 
 
 @typechecked
 class _OnnxExportAdaptor(nn.Module):
-    def __init__(self, model: nn.Module, tags: Set[str]) -> None:
+    def __init__(self, model: BrickCollection, tags: Optional[Set[str]] = None) -> None:
         super().__init__()
         self.model = model.sub_collection(tags=tags)
 
@@ -32,7 +31,6 @@ def export_bricks_as_onnx(
     tags: Optional[Set[str]] = None,
     **onnx_export_kwargs,
 ):
-    tags = tags or model_stage.EXPORT
     outputs = brick_collection(named_inputs=named_inputs, tags=tags, return_inputs=False)
     onnx_exportable = _OnnxExportAdaptor(model=brick_collection, tags=tags)
     output_names = list(outputs)
@@ -67,20 +65,20 @@ def filter_brick_types(brick_collection: BrickCollection, types: Tuple) -> Dict[
     return metrics
 
 
-def copy_metric_bricks(brick_collection: BrickCollection) -> BrickCollection:
-    brick_collection = dict(brick_collection)
-    for brick_name, brick in brick_collection.items():
+def copy_metric_bricks(brick_collection: BrickCollection) -> Dict[str, Any]:
+    brick_collection_dict = dict(brick_collection)
+    for brick_name, brick in brick_collection_dict.items():
         if isinstance(brick, BrickCollection):
-            brick_collection[brick_name] = copy_metric_bricks(brick)
+            brick_collection_dict[brick_name] = copy_metric_bricks(brick)
         elif isinstance(brick, (BrickMetrics, BrickMetricSingle)):
             # brick_metrics = brick_collection.pop(brick_name)
             # brick_metrics.metrics = brick_metrics.metrics.clone()
-            brick_collection[brick_name] = copy.deepcopy(brick)
+            brick_collection_dict[brick_name] = copy.deepcopy(brick)
 
-    return brick_collection
+    return brick_collection_dict
 
 
-def per_stage_brick_collections(brick_collection: BrickCollection) -> Dict[str, BrickCollection]:
+def per_stage_brick_collections(brick_collection: BrickCollection) -> torch.nn.ModuleDict:
     # We need to keep metrics separated for each model stage (train, validation, test), we do that by making a brick collection for each
     # stage. Only the metrics are copied to each stage - other bricks are shared. This is necessary because PyTorch Lightning
     # runs all training steps, all validation steps and then 'on_validation_epoch_end' and 'on_train_epoch_end'.

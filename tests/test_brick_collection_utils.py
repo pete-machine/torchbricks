@@ -5,9 +5,9 @@ import pytest
 import torch
 from utils_testing.utils_testing import create_dummy_brick_collection
 
-from torchbricks import model_stage
 from torchbricks.brick_collection import BrickCollection
 from torchbricks.brick_collection_utils import export_bricks_as_onnx
+from torchbricks.brick_tags import Tag
 
 
 def test_export_onnx_trace(tmp_path: Path):
@@ -15,8 +15,8 @@ def test_export_onnx_trace(tmp_path: Path):
     brick_collection = create_dummy_brick_collection(num_classes=num_classes, num_backbone_featues=10)
     model = BrickCollection(brick_collection)
     named_inputs = {"raw": torch.zeros((1, 3, 64, 64))}
-
-    named_outputs = model(named_inputs, tags=model_stage.EXPORT, return_inputs=False)
+    tags = {Tag.MODEL}
+    named_outputs = model(named_inputs, tags=tags, return_inputs=False)
     # remove_from_outputs = ["stage"] + list(named_inputs)
     expected_input = list(named_inputs)
     expected_outputs = list(named_outputs)
@@ -25,7 +25,9 @@ def test_export_onnx_trace(tmp_path: Path):
 
     dynamic_batch_size_configs = [False, True]
     for dynamic_batch_size in dynamic_batch_size_configs:
-        export_bricks_as_onnx(brick_collection=model, named_inputs=named_inputs, path_onnx=path_onnx, dynamic_batch_size=dynamic_batch_size)
+        export_bricks_as_onnx(
+            brick_collection=model, named_inputs=named_inputs, tags=tags, path_onnx=path_onnx, dynamic_batch_size=dynamic_batch_size
+        )
 
         assert path_onnx.exists()
         onnx_model = onnx.load(path_onnx)
@@ -44,7 +46,7 @@ def test_export_torch_jit_script(tmp_path: Path):
     num_classes = 3
     brick_collection = create_dummy_brick_collection(num_classes=num_classes, num_backbone_featues=10)
 
-    model = BrickCollection(brick_collection).to_sub_collection(tags=model_stage.EXPORT)
+    model = BrickCollection(brick_collection).sub_collection(tags={Tag.MODEL})
     named_inputs = {"raw": torch.zeros((1, 3, 64, 64))}
 
     named_outputs = model(named_inputs, return_inputs=False)

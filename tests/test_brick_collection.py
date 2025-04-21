@@ -10,9 +10,10 @@ from torch import nn
 from utils_testing.utils_testing import assert_equal_dictionaries, create_dummy_brick_collection, is_equal_model_parameters
 
 import torchbricks.brick_collection
-from torchbricks import bricks, model_stage
+from torchbricks import bricks
 from torchbricks.brick_collection import BrickCollection
-from torchbricks.bricks import BrickModule, Tag
+from torchbricks.brick_tags import Tag
+from torchbricks.bricks import BrickModule
 
 
 def test_brick_collection():
@@ -99,8 +100,9 @@ def test_brick_collection_no_metrics():
     model = torchbricks.brick_collection.BrickCollection(bricks=brick_collection)
 
     named_inputs = {"labels": torch.tensor(range(num_classes), dtype=torch.float64), "raw": torch.zeros((3, 24, 24))}
-    named_outputs = model(named_inputs=named_inputs, tags=model_stage.INFERENCE)
-    assert expected_forward_named_outputs == set(named_outputs)
+    named_outputs = model(named_inputs=named_inputs, tags={Tag.MODEL, Tag.LOSS})
+    expected_outputs = expected_forward_named_outputs.union(expected_named_losses)
+    assert expected_outputs == set(named_outputs)
 
     named_outputs = model(named_inputs=named_inputs)
     named_outputs = model(named_inputs=named_inputs)
@@ -123,7 +125,7 @@ def test_brick_collection_no_metrics_no_losses():
     model = torchbricks.brick_collection.BrickCollection(bricks=brick_collection)
 
     named_inputs = {"labels": torch.tensor(range(num_classes), dtype=torch.float64), "raw": torch.zeros((3, 24, 24))}
-    named_outputs = model(named_inputs=named_inputs, tags=model_stage.INFERENCE)
+    named_outputs = model(named_inputs=named_inputs)
     assert expected_forward_named_outputs == set(named_outputs)
 
     model(named_inputs=named_inputs)
@@ -321,7 +323,7 @@ def test_no_inputs_or_outputs():
     }
 
     brick_collection = BrickCollection(bricks)
-    brick_collection(named_inputs={"raw": torch.rand((2, 3, 100, 200))}, tags=model_stage.INFERENCE)
+    brick_collection(named_inputs={"raw": torch.rand((2, 3, 100, 200))})
 
 
 def test_input_names_all():
@@ -334,7 +336,7 @@ def test_input_names_all():
 
     dict_bricks["Visualize"] = bricks.BrickNotTrainable(VisualizePredictions(), input_names=["__all__"], output_names=["visualized"])
     brick_collection = BrickCollection(dict_bricks)
-    brick_collection(named_inputs={"raw": torch.rand((2, 3, 100, 200))}, tags=model_stage.INFERENCE)
+    brick_collection(named_inputs={"raw": torch.rand((2, 3, 100, 200))}, tags={Tag.MODEL})
 
 
 def test_save_and_load_of_brick_collection(tmp_path: Path):
@@ -350,7 +352,7 @@ def test_save_and_load_of_brick_collection(tmp_path: Path):
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("tags", [None, model_stage.INFERENCE])
+@pytest.mark.parametrize("tags", [None, {Tag.MODEL}])
 def test_compile(tags):
     torch._dynamo.config.suppress_errors = True  # TODO: Remove this line later when possible
     num_classes = 3

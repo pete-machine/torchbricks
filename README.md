@@ -10,7 +10,7 @@ jupyter:
       format_version: '1.3'
       jupytext_version: 1.14.5
   kernelspec:
-    display_name: torchbricks
+    display_name: .venv
     language: python
     name: python3
 ---
@@ -424,6 +424,7 @@ brick_collection.to(torch.float32)
 
 # Save model parameters
 path_model = Path("build/readme_model.pt")
+path_model.parent.mkdir(parents=True, exist_ok=True)
 torch.save(brick_collection.state_dict(), path_model)
 
 # Load model parameters

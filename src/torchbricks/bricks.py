@@ -7,17 +7,10 @@ from torch import nn
 from torchmetrics import Metric, MetricCollection
 from typeguard import typechecked
 
+from torchbricks.brick_tags import Tag
 from torchbricks.bricks_helper import named_input_and_outputs_callable, parse_argument_loss_output_name_indices
 
 log = logging.getLogger(__name__)
-
-
-class Tag:
-    MODEL = "MODEL"
-    LOSS = "LOSS"
-    METRIC = "METRIC"
-    METRIC_EXTRA = "METRIC_EXTRA"
-    VISUALIZATION = "VISUALIZATION"
 
 
 def use_default_style(overwrites: Optional[Dict[str, str]] = None):
