@@ -10,7 +10,7 @@ from torchbricks.brick_collection_utils import per_stage_brick_collections
 from torchbricks.brick_tags import DEFAULT_MODEL_STAGE_TAGS, ModelStage
 
 
-class LightningBrickCollection(LightningModule):
+class LightningBricks(LightningModule):
     def __init__(
         self,
         path_experiments: Path,
@@ -42,8 +42,8 @@ class LightningBrickCollection(LightningModule):
 
     def _step(self, stage: ModelStage, batch, batch_idx: int):
         stage_str = stage.value.lower()
-        named_inputs = {"raw": batch[0], "targets": batch[1], "batch_idx": batch_idx}
-        named_outputs = self.bricks[stage.name](named_inputs=named_inputs, tags=self.model_stage_tags[stage.name])
+        # named_inputs = {"raw": batch[0], "targets": batch[1], "batch_idx": batch_idx}
+        named_outputs = self.bricks[stage.name](named_inputs=batch, tags=self.model_stage_tags[stage.name])
         losses = self.bricks[stage.name].extract_losses(named_outputs=named_outputs)
         loss = 0
         for loss_name, loss_value in losses.items():

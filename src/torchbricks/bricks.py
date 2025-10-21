@@ -223,7 +223,7 @@ class BrickMetrics(BrickInterface, nn.Module):
 
     def forward(self, named_inputs: Dict[str, Any]) -> Dict[str, Any]:
         if self.return_metrics:
-            output_names = ["metrics"]
+            output_names = self.output_names
             metric_callable = self.metrics  # Return metrics as a dictionary
         else:
             output_names = []
@@ -237,7 +237,7 @@ class BrickMetrics(BrickInterface, nn.Module):
             calculate_gradients=False,
         )
         if self.return_metrics:
-            return output["metrics"]  # Metrics in a dictionary
+            return output  # Metrics in a dictionary
         else:
             assert output == {}
             return {}

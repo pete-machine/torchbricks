@@ -10,7 +10,7 @@ jupyter:
       format_version: '1.3'
       jupytext_version: 1.14.5
   kernelspec:
-    display_name: .venv
+    display_name: torchbricks
     language: python
     name: python3
 ---
@@ -616,7 +616,7 @@ and injected into the lightning module.
 
 Below is an example of how you could inject a brick collection with pytorch-lightning. 
 
-We have created `LightningBrickCollection` ([available here](https://github.com/PeteHeine/torchbricks/blob/main/scripts/lightning_module.py)) 
+We have created `LightningBricks](https://github.com/pete-machine/torchbricks/blob/main/scripts/train_lightning_cifar10.py))
 as an example for you to use. 
 
 
@@ -627,13 +627,14 @@ from pathlib import Path
 import pytorch_lightning as pl
 import torchvision
 from utils_testing.datamodule_cifar10 import CIFAR10DataModule
-from utils_testing.lightning_module import LightningBrickCollection
+
+from torchbricks.lightning_bricks.lightning_bricks import LightningBricks
 
 experiment_name = "CIFAR10"
 transform = torchvision.transforms.ToTensor()
 data_module = CIFAR10DataModule(data_dir="data", batch_size=5, num_workers=12, test_transforms=transform, train_transforms=transform)
 create_optimizer_func = partial(torch.optim.SGD, lr=0.05, momentum=0.9, weight_decay=5e-4)
-bricks_lightning_module = LightningBrickCollection(
+bricks_lightning_module = LightningBricks(
     path_experiments=Path("build") / "experiments",
     experiment_name=None,
     brick_collection=brick_collection,

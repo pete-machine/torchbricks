@@ -15,15 +15,21 @@ def check_input_names(named_inputs: Dict[str, Any], input_names: List[str]):
     )
 
 
-def positional_arguments_from_list_input_names(named_inputs: Dict[str, Any], input_names: List[str]) -> List:
+def positional_arguments_from_list_input_names(
+    named_inputs: Dict[str, Any], input_names: List[str]
+) -> List:
     check_input_names(named_inputs=named_inputs, input_names=input_names)
-    selected_inputs = [named_inputs if name == __ALL__ else named_inputs[name] for name in input_names]
+    selected_inputs = [
+        named_inputs if name == __ALL__ else named_inputs[name] for name in input_names
+    ]
     return selected_inputs
 
 
 def keyword_arguments_from_dict_input_names(named_inputs, input_names):
     input_name_keys = list(input_names.values())
-    selected_inputs = positional_arguments_from_list_input_names(named_inputs, input_names=input_name_keys)
+    selected_inputs = positional_arguments_from_list_input_names(
+        named_inputs, input_names=input_name_keys
+    )
     argument_names_callable = list(input_names)
     arguments_and_values = dict(zip(argument_names_callable, selected_inputs))
     return arguments_and_values
@@ -39,10 +45,13 @@ def name_callable_outputs(outputs: Any, output_names: List[str]) -> Dict[str, An
                 f'"len(output_names)==0". However the following {output_names=} was specified'
             )
 
+    if isinstance(outputs, dict):
+        outputs = tuple(outputs.values())
     if not isinstance(outputs, tuple):
         outputs = (outputs,)
     assert len(outputs) == len(output_names), (
-        f"The number of specified output names {output_names=} " f"does not match the actual number of outputs `{len(outputs)=}`"
+        f"The number of specified output names {output_names=} "
+        f"does not match the actual number of outputs `{len(outputs)=}`"
     )
     return dict(zip(output_names, outputs))
 
@@ -56,10 +65,14 @@ def named_input_and_outputs_callable(
     calculate_gradients: bool = True,
 ) -> Dict[str, Any]:
     if isinstance(input_names, list):
-        selected_inputs = positional_arguments_from_list_input_names(named_inputs, input_names=input_names)
+        selected_inputs = positional_arguments_from_list_input_names(
+            named_inputs, input_names=input_names
+        )
         outputs = callable(*selected_inputs)
     elif isinstance(input_names, dict):
-        arguments_and_values = keyword_arguments_from_dict_input_names(named_inputs, input_names)
+        arguments_and_values = keyword_arguments_from_dict_input_names(
+            named_inputs, input_names
+        )
         outputs = callable(**arguments_and_values)
     else:
         raise ValueError(
@@ -75,14 +88,22 @@ def named_input_and_outputs_callable(
 
 
 @typechecked
-def parse_argument_loss_output_name_indices(loss_output_names: Union[List[str], str], available_output_names: List[str]) -> List[int]:
+def parse_argument_loss_output_name_indices(
+    loss_output_names: Union[List[str], str], available_output_names: List[str]
+) -> List[int]:
     if loss_output_names == "all":
         loss_output_names = available_output_names
     elif loss_output_names == "none":
         loss_output_names = []
 
-    assert isinstance(loss_output_names, List), f"`loss_output_names` should be `all`, `none` or a list of strings. {loss_output_names=}"
-    assert set(loss_output_names).issubset(available_output_names), (
-        f"One or more {loss_output_names=} is not an " "`output_names` of brick {output_names=}"
+    assert isinstance(loss_output_names, List), (
+        f"`loss_output_names` should be `all`, `none` or a list of strings. {loss_output_names=}"
     )
-    return [available_output_names.index(loss_output_name) for loss_output_name in loss_output_names]
+    assert set(loss_output_names).issubset(available_output_names), (
+        f"One or more {loss_output_names=} is not an "
+        "`output_names` of brick {output_names=}"
+    )
+    return [
+        available_output_names.index(loss_output_name)
+        for loss_output_name in loss_output_names
+    ]
